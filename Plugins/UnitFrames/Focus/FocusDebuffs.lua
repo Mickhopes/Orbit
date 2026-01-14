@@ -18,7 +18,6 @@ local Plugin = Orbit:RegisterPlugin("Focus Debuffs", SYSTEM_ID, {
 Mixin(Plugin, Orbit.AuraMixin)
 
 local Frame
-local Frame
 
 -- [ HELPERS ]----------------------------------------------------------------------------------------
 function Plugin:IsEnabled()
@@ -128,8 +127,6 @@ function Plugin:OnLoad()
     else
         Frame:SetPoint("CENTER", UIParent, "CENTER", -200, -240)
     end
-
-    self:ApplySettings()
 
     self:ApplySettings()
 
@@ -295,11 +292,7 @@ function Plugin:UpdateVisibility()
             RegisterUnitWatch(Frame)
         end
         if UnitExists("focus") then
-            -- Frame:Show() handled by RegisterUnitWatch
-            if UnitExists("focus") then
-                -- Frame:Show() handled by RegisterUnitWatch
-                self:UpdateDebuffs()
-            end
+            self:UpdateDebuffs()
         end
     else
         if not InCombatLockdown() then

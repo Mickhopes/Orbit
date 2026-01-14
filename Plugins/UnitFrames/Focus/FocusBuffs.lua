@@ -18,7 +18,6 @@ local Plugin = Orbit:RegisterPlugin("Focus Buffs", SYSTEM_ID, {
 Mixin(Plugin, Orbit.AuraMixin)
 
 local Frame
-local Frame
 
 -- [ HELPERS ]----------------------------------------------------------------------------------------
 function Plugin:IsEnabled()
@@ -128,8 +127,6 @@ function Plugin:OnLoad()
     else
         Frame:SetPoint("CENTER", UIParent, "CENTER", -200, -200)
     end
-
-    self:ApplySettings()
 
     self:ApplySettings()
 
@@ -293,11 +290,7 @@ function Plugin:UpdateVisibility()
             RegisterUnitWatch(Frame)
         end
         if UnitExists("focus") then
-            -- Frame:Show() handled by RegisterUnitWatch
-            if UnitExists("focus") then
-                -- Frame:Show() handled by RegisterUnitWatch
-                self:UpdateBuffs()
-            end
+            self:UpdateBuffs()
         end
     else
         if not InCombatLockdown() then

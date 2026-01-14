@@ -19,7 +19,6 @@ local Plugin = Orbit:RegisterPlugin("Target Debuffs", SYSTEM_ID, {
 Mixin(Plugin, Orbit.AuraMixin)
 
 local Frame
-local Frame
 
 -- [ HELPERS ]----------------------------------------------------------------------------------------
 function Plugin:IsEnabled()
@@ -130,8 +129,6 @@ function Plugin:OnLoad()
     else
         Frame:SetPoint("CENTER", UIParent, "CENTER", 200, -220)
     end
-
-    self:ApplySettings()
 
     self:ApplySettings()
 
@@ -306,11 +303,7 @@ function Plugin:UpdateVisibility()
         end
 
         if UnitExists("target") then
-            -- Frame:Show() handled by RegisterUnitWatch
-            if UnitExists("target") then
-                -- Frame:Show() handled by RegisterUnitWatch
-                self:UpdateDebuffs()
-            end
+            self:UpdateDebuffs()
         end
     else
         if not InCombatLockdown() then

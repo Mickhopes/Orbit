@@ -198,7 +198,7 @@ end
 
 function Anchor:CreateAnchor(child, parent, edge, padding, syncOptions, align, suppressApplySettings)
     if padding == nil then
-        padding = DEFAULT_PADDING -- Default 4px gap
+        padding = DEFAULT_PADDING -- Default 2px gap
     end
 
     -- Prevent circular anchoring
@@ -257,7 +257,8 @@ function Anchor:CreateAnchor(child, parent, edge, padding, syncOptions, align, s
         if child.orbitPlugin.UpdateLayout then
             child.orbitPlugin:UpdateLayout(child)
         elseif not suppressApplySettings and child.orbitPlugin.ApplySettings then
-            if not (EditModeManagerFrame and EditModeManagerFrame:IsShown()) then
+            local isEditMode = EditModeManagerFrame and EditModeManagerFrame.IsEditModeActive and EditModeManagerFrame:IsEditModeActive()
+            if not isEditMode then
                 child.orbitPlugin:ApplySettings(child)
             end
         end
@@ -376,57 +377,41 @@ function Anchor:IsEdgeOccupied(parent, edge, excludeChild)
     return false
 end
 
-function Anchor:SyncChildren(parent, suppressApplySettings)
+function Anchor:SyncChildren(parent, suppressApplySettings, visited)
     if not parent or not parent.GetScale or not parent.GetWidth then
         return
     end
+
+    -- Prevent infinite recursion with visited set
+    visited = visited or {}
+    if visited[parent] then
+        return
+    end
+    visited[parent] = true
 
     local parentScale = parent:GetScale()
     local parentWidth = parent:GetWidth()
     local parentHeight = parent:GetHeight()
 
-    -- Fast Path: During Edit Mode, just reposition children without full ApplySettings cascade
-    -- This prevents exponential performance cost when dragging linked chains
-    if EditModeManagerFrame and EditModeManagerFrame:IsShown() and not InCombatLockdown() then
-        for child, anchor in pairs(self.anchors) do
-            if anchor.parent == parent then
-                if not child:IsForbidden() then
-                    local opts = anchor.syncOptions or GetFrameOptions(child)
-
-                    if opts.syncScale then
-                        child:SetScale(parentScale)
-                    end
-
-                    if opts.syncDimensions then
-                        if anchor.edge == "LEFT" or anchor.edge == "RIGHT" then
-                            local height = parentHeight
-                            if opts.useRowDimension and parent.orbitRowHeight then
-                                height = parent.orbitRowHeight
-                            end
-                            child:SetHeight(height)
-                        else
-                            local width = parentWidth
-                            if opts.useRowDimension and parent.orbitColumnWidth then
-                                width = parent.orbitColumnWidth
-                            end
-                            child:SetWidth(width)
-                        end
-                    end
-
-                    -- Use helper instead of CreateAnchor to avoid recursion
-                    ApplyAnchorPosition(child, parent, anchor.edge, anchor.padding, anchor.align, opts)
-
-                    -- Recursively update grandchildren using fast path (without full sync)
-                    self:SyncChildren(child, suppressApplySettings)
-                end
-            end
-        end
-        return
-    end
-
+    -- Snapshot children to avoid modifying table during iteration
+    local childrenToSync = {}
     for child, anchor in pairs(self.anchors) do
         if anchor.parent == parent then
-            if not child:IsForbidden() and (not InCombatLockdown() or not child:IsProtected()) then
+            table.insert(childrenToSync, { child = child, anchor = anchor })
+        end
+    end
+
+    local isEditMode = EditModeManagerFrame
+        and EditModeManagerFrame.IsEditModeActive
+        and EditModeManagerFrame:IsEditModeActive()
+
+    -- Fast Path: During Edit Mode, just reposition children without full ApplySettings cascade
+    -- This prevents exponential performance cost when dragging linked chains
+    if isEditMode and not InCombatLockdown() then
+        for _, entry in ipairs(childrenToSync) do
+            local child = entry.child
+            local anchor = entry.anchor
+            if not child:IsForbidden() then
                 local opts = anchor.syncOptions or GetFrameOptions(child)
 
                 if opts.syncScale then
@@ -449,16 +434,59 @@ function Anchor:SyncChildren(parent, suppressApplySettings)
                     end
                 end
 
-                if child.orbitPlugin then
-                    if child.orbitPlugin.UpdateLayout then
-                        child.orbitPlugin:UpdateLayout(child)
-                    elseif not suppressApplySettings and child.orbitPlugin.ApplySettings then
-                        child.orbitPlugin:ApplySettings(child)
-                    end
+                -- Use helper instead of CreateAnchor to avoid recursion
+                ApplyAnchorPosition(child, parent, anchor.edge, anchor.padding, anchor.align, opts)
+
+                -- Call UpdateLayout for live icon recalculation in edit mode
+                if child.orbitPlugin and child.orbitPlugin.UpdateLayout then
+                    child.orbitPlugin:UpdateLayout(child)
                 end
 
-                self:SyncChildren(child, suppressApplySettings)
+                -- Recursively update grandchildren using fast path (without full sync)
+                self:SyncChildren(child, suppressApplySettings, visited)
             end
+        end
+        return
+    end
+
+    for _, entry in ipairs(childrenToSync) do
+        local child = entry.child
+        local anchor = entry.anchor
+        if not child:IsForbidden() and (not InCombatLockdown() or not child:IsProtected()) then
+            local opts = anchor.syncOptions or GetFrameOptions(child)
+
+            if opts.syncScale then
+                child:SetScale(parentScale)
+            end
+
+            if opts.syncDimensions then
+                if anchor.edge == "LEFT" or anchor.edge == "RIGHT" then
+                    local height = parentHeight
+                    if opts.useRowDimension and parent.orbitRowHeight then
+                        height = parent.orbitRowHeight
+                    end
+                    child:SetHeight(height)
+                else
+                    local width = parentWidth
+                    if opts.useRowDimension and parent.orbitColumnWidth then
+                        width = parent.orbitColumnWidth
+                    end
+                    child:SetWidth(width)
+                end
+            end
+
+            -- Apply position update (was missing in normal path)
+            ApplyAnchorPosition(child, parent, anchor.edge, anchor.padding, anchor.align, opts)
+
+            if child.orbitPlugin then
+                if child.orbitPlugin.UpdateLayout then
+                    child.orbitPlugin:UpdateLayout(child)
+                elseif not suppressApplySettings and child.orbitPlugin.ApplySettings then
+                    child.orbitPlugin:ApplySettings(child)
+                end
+            end
+
+            self:SyncChildren(child, suppressApplySettings, visited)
         end
     end
 end
