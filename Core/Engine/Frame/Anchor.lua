@@ -78,7 +78,7 @@ local function ApplyAnchorPosition(child, parent, edge, padding, align, syncOpti
         -- Calculate Overlap needed to make contents touch
         -- We want to remove the space of BOTH borders (since both are hidden)
         -- Overlap = ParentBorder + ChildBorder
-        local pSize = (parent.borderPixelSize or 1) -- fallback to 1 logic unit? or 0?
+        local pSize = (parent.borderPixelSize or 1)
         local cSize = (child.borderPixelSize or 1)
 
         -- If we can't find exact size, we might guess based on Pixel scale, but exact is better.
@@ -207,6 +207,7 @@ function Anchor:CreateAnchor(child, parent, edge, padding, syncOptions, align, s
     end
 
     -- Prevent anchoring to an edge that's already occupied by another child
+    -- TODO: Maybe adjust this in the future for non-width synced frames?
     if self:IsEdgeOccupied(parent, edge, child) then
         return false
     end

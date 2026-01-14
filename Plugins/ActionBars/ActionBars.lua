@@ -113,15 +113,15 @@ local BAR_CONFIG = {
         count = 2,
         isSpecial = true,
     },
-    {
-        blizzName = "ExtraAbilityContainer",
-        orbitName = "OrbitExtraBar",
-        label = "Extra Action",
-        index = 12,
-        buttonPrefix = "ExtraActionButton",
-        count = 1,
-        isSpecial = true,
-    },
+    -- { TODO: This isn't working properly, add later.
+    --     blizzName = "ExtraAbilityContainer",
+    --     orbitName = "OrbitExtraBar",
+    --     label = "Extra Action",
+    --     index = 12,
+    --     buttonPrefix = "ExtraActionButton",
+    --     count = 1,
+    --     isSpecial = true,
+    -- },
 }
 
 local Plugin = Orbit:RegisterPlugin("Action Bars", "Orbit_ActionBars", {
@@ -723,8 +723,8 @@ function Plugin:LayoutButtons(index)
 
                 local x, y = OrbitEngine.Layout:ComputeGridPosition(i, limitPerLine, orientation, w, h, padding)
                 button:SetPoint("TOPLEFT", container, "TOPLEFT", x, y)
-            end -- end of if/else show/hide
-        end -- end of if i > numIcons
+            end
+        end
     end
 
     -- Calculate container size based on NumIcons (strict grid)
