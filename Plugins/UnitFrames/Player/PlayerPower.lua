@@ -48,7 +48,7 @@ local Plugin = Orbit:RegisterPlugin("Player Power", SYSTEM_ID, {
         TextSize = 12,
         TextAlignment = "CENTER",
     },
-}, Orbit.Constants.PluginGroups.UnitFrames)
+}, Orbit.Constants.PluginGroups.CooldownManager)
 
 -- Frame references (created in OnLoad)
 local Frame, PowerBar

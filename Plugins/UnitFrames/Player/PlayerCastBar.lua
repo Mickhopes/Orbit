@@ -13,7 +13,7 @@ local Plugin = Orbit:RegisterPlugin("Player Cast Bar", "Orbit_PlayerCastBar", {
         CastBarHeight = Orbit.Constants.PlayerCastBar.DefaultHeight,
         CastBarScale = 100,
     },
-}, Orbit.Constants.PluginGroups.UnitFrames)
+}, Orbit.Constants.PluginGroups.CooldownManager)
 
 -------------------------------------------------
 -- CONSTANTS

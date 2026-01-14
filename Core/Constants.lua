@@ -24,9 +24,11 @@ C.Panel = {
 
 C.PluginGroups = {
     UnitFrames = "Unit Frames",
+    ActionBars = "Action Bars",
+    CooldownManager = "Cooldown Manager",
     MenuItems = "Menu Items",
-    Misc = "Misc",
     BossFrames = "Boss Frames",
+    Misc = "Misc",
 }
 
 C.Footer = {

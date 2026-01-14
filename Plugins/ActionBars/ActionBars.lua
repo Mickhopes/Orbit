@@ -133,7 +133,7 @@ local Plugin = Orbit:RegisterPlugin("Action Bars", "Orbit_ActionBars", {
         Opacity = 100,
         HideEmptyButtons = false,
     },
-})
+}, Orbit.Constants.PluginGroups.ActionBars)
 
 -- Apply NativeBarMixin for mouse-over fade
 Mixin(Plugin, Orbit.NativeBarMixin)

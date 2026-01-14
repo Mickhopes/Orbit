@@ -47,7 +47,7 @@ local Plugin = Orbit:RegisterPlugin("Player Resources", SYSTEM_ID, {
         Height = Orbit.Constants.PlayerResources.DefaultHeight,
         ShowText = true,
     },
-}, Orbit.Constants.PluginGroups.UnitFrames)
+}, Orbit.Constants.PluginGroups.CooldownManager)
 
 -- Frame reference (created in OnLoad)
 local Frame
