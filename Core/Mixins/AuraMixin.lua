@@ -31,7 +31,6 @@ function Mixin:FetchAuras(unit, filter, maxCount)
     local auras = {}
     maxCount = maxCount or DEFAULT_AURA_COUNT
 
-    -- Prefer GetUnitAuras (batch API, supports sorting)
     if C_UnitAuras and C_UnitAuras.GetUnitAuras then
         local ok, result = pcall(C_UnitAuras.GetUnitAuras, unit, filter, nil, nil)
         if ok and type(result) == "table" then
@@ -44,24 +43,6 @@ function Mixin:FetchAuras(unit, filter, maxCount)
             end
             return auras
         end
-    end
-
-    -- Fallback to indexed iteration (older clients or if GetUnitAuras fails)
-    local isHelpful = filter and filter:find("HELPFUL")
-    local playerFilter = filter and filter:find("PLAYER") and "PLAYER" or nil
-
-    for i = 1, maxCount do
-        local aura
-        if isHelpful then
-            aura = C_UnitAuras.GetBuffDataByIndex(unit, i, playerFilter)
-        else
-            aura = C_UnitAuras.GetDebuffDataByIndex(unit, i, playerFilter)
-        end
-        if not aura then
-            break
-        end
-        aura.index = i
-        table.insert(auras, aura)
     end
 
     return auras
@@ -160,27 +141,6 @@ function Mixin:ApplyAuraCooldown(icon, aura, unit)
         local ok, durationObj = pcall(C_UnitAuras.GetAuraDuration, unit, aura.auraInstanceID)
         if ok and durationObj then
             if pcall(icon.Cooldown.SetCooldownFromDurationObject, icon.Cooldown, durationObj) then
-                applied = true
-                icon.Cooldown:Show()
-            end
-        end
-    end
-
-    -- Method 2: Traditional SetCooldown (fallback, pcall for safety)
-    if not applied then
-        local showCooldown = false
-        if type(aura.duration) == "number" then
-            local ok, result = pcall(function()
-                return aura.duration > 0
-            end)
-            showCooldown = ok and result
-        end
-
-        if showCooldown and aura.expirationTime then
-            local ok = pcall(function()
-                icon.Cooldown:SetCooldown(aura.expirationTime - aura.duration, aura.duration)
-            end)
-            if ok then
                 applied = true
                 icon.Cooldown:Show()
             end
@@ -318,6 +278,15 @@ function Mixin:LayoutAurasGrid(frame, icons, config)
     local currentX = xOffset
     local currentY = yOffset
 
+    -- Pixel Snap Layout
+    if Orbit.Engine.Pixel then
+        local scale = frame:GetEffectiveScale()
+        size = Orbit.Engine.Pixel:Snap(size, scale)
+        spacing = Orbit.Engine.Pixel:Snap(spacing, scale)
+        currentX = Orbit.Engine.Pixel:Snap(currentX, scale)
+        currentY = Orbit.Engine.Pixel:Snap(currentY, scale)
+    end
+
     -- Determine layout direction parameters
     local iconPoint, yStep
     if growthY == "UP" then
@@ -357,6 +326,13 @@ function Mixin:LayoutAurasLinear(container, icons, config)
     local growDirection = config.growDirection or "RIGHT"
 
     local xOffset = 0
+    
+    if Orbit.Engine.Pixel then
+        local scale = container:GetEffectiveScale()
+        size = Orbit.Engine.Pixel:Snap(size, scale)
+        spacing = Orbit.Engine.Pixel:Snap(spacing, scale)
+    end
+
     for i, icon in ipairs(icons) do
         icon:ClearAllPoints()
 

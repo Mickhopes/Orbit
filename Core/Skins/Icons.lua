@@ -23,6 +23,8 @@ Icons.regionCache = setmetatable({}, { __mode = "k" })
 Icons.borderCache = setmetatable({}, { __mode = "k" })
 Icons.monitorTickers = {}
 
+local Pixel = Orbit.Engine and Orbit.Engine.Pixel
+
 function Icons:ApplyManualLayout(frame, icons, settings)
     local padding = tonumber(settings.padding)
     if not padding then
@@ -67,6 +69,8 @@ function Icons:ApplyManualLayout(frame, icons, settings)
     local maxMajorSize = (math.min(totalIcons, limit) * (orientation == 0 and w or h))
         + ((math.min(totalIcons, limit) - 1) * padding)
 
+    local scale = frame:GetEffectiveScale()
+
     for i, icon in ipairs(icons) do
         icon:ClearAllPoints()
 
@@ -102,6 +106,12 @@ function Icons:ApplyManualLayout(frame, icons, settings)
                 x = col * (w + padding)
                 y = centeringOffset + (row * (h + padding))
             end
+
+            if Pixel then
+                x = Pixel:Snap(x, scale)
+                y = Pixel:Snap(y, scale)
+            end
+
             icon:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", x, y)
         else
             if orientation == 0 then
@@ -111,6 +121,12 @@ function Icons:ApplyManualLayout(frame, icons, settings)
                 x = col * (w + padding)
                 y = -(centeringOffset + (row * (h + padding)))
             end
+
+            if Pixel then
+                x = Pixel:Snap(x, scale)
+                y = Pixel:Snap(y, scale)
+            end
+
             icon:SetPoint("TOPLEFT", frame, "TOPLEFT", x, y)
         end
     end
@@ -391,6 +407,12 @@ function Icons:ApplyCustom(icon, settings)
     if tex then
         local newWidth, newHeight, rw, rh = self:CalculateGeometry(icon, settings)
 
+        if Pixel then
+             local scale = icon:GetEffectiveScale()
+             newWidth = Pixel:Snap(newWidth, scale)
+             newHeight = Pixel:Snap(newHeight, scale)
+        end
+
         -- Use generic OrbSkin for base icon skinning
         Skin:SkinIcon(tex, settings)
 
@@ -554,7 +576,7 @@ function Icons:ApplyCustom(icon, settings)
         end
 
         local borderStyle = settings.borderStyle or 0
-        local borderSize = settings.borderSize or 1
+        local borderSize = settings.borderSize
 
         if r.border then
             if borderStyle == 1 then

@@ -209,10 +209,18 @@ function Snap:DetectSnap(frame, showGuides, targets, isLockedFn)
     if not showGuides and (closestX or closestY) then
         local l, b = frame:GetLeft(), frame:GetBottom()
         if closestX then
-            l = l + (closestX / fScale)
+            local val = (closestX / fScale)
+            if Engine.Pixel then 
+                 val = Engine.Pixel:Snap(val, frame:GetEffectiveScale()) 
+            end
+            l = l + val
         end
         if closestY then
-            b = b + (closestY / fScale)
+            local val = (closestY / fScale)
+            if Engine.Pixel then 
+                 val = Engine.Pixel:Snap(val, frame:GetEffectiveScale()) 
+            end
+            b = b + val
         end
 
         frame:ClearAllPoints()
@@ -268,6 +276,15 @@ function Snap:NormalizePosition(frame)
 
     if point == "" then
         point = "CENTER"
+    end
+
+    -- Snap to pixel grid
+    if Engine.Pixel then
+        local effectiveScale = frame:GetEffectiveScale()
+        if effectiveScale then
+            x = Engine.Pixel:Snap(x / scale, effectiveScale) * scale
+            y = Engine.Pixel:Snap(y / scale, effectiveScale) * scale
+        end
     end
 
     return point, x / scale, y / scale

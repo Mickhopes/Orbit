@@ -113,60 +113,21 @@ function FrameFactory:Create(name, plugin, opts)
     end
 
     frame.SetBorder = function(self, size)
-        -- Calculation: Convert desired physical pixels (size) to frame-local units
-        -- Use new Pixel Engine (or fallback during init)
-        local pixelScale = (Engine.Pixel and Engine.Pixel:GetScale())
-            or (768.0 / (select(2, GetPhysicalScreenSize()) or 768.0))
-
-        local scale = self:GetEffectiveScale()
-        if not scale or scale < 0.01 then
-            scale = 1
-        end
-
-        local mult = pixelScale / scale
-        local pixelSize = (size or 1) * mult
-        self.borderPixelSize = pixelSize
-
-        -- Create borders if needed
-        if not self.Borders then
-            self.Borders = {}
-            local function CreateLine()
-                local t = self:CreateTexture(nil, "BORDER")
-                t:SetColorTexture(0, 0, 0, 1)
-                return t
+        -- Delegate to Skin Engine
+        if Orbit.Skin:SkinBorder(self, self, size) then
+            -- Reset Bar Inset to 0 (Remove gap/shadow)
+            local bar = self.orbitBar or self.Bar
+            if bar then
+                bar:ClearAllPoints()
+                bar:SetPoint("TOPLEFT", 0, 0)
+                bar:SetPoint("BOTTOMRIGHT", 0, 0)
             end
-            self.Borders.Top = CreateLine()
-            self.Borders.Bottom = CreateLine()
-            self.Borders.Left = CreateLine()
-            self.Borders.Right = CreateLine()
+            self.borderPixelSize = 0
+            return
         end
 
-        local b = self.Borders
-
-        -- Non-overlapping Layout
-        -- Top/Bottom: Full Width
-        b.Top:ClearAllPoints()
-        b.Top:SetPoint("TOPLEFT", self, "TOPLEFT", 0, 0)
-        b.Top:SetPoint("TOPRIGHT", self, "TOPRIGHT", 0, 0)
-        b.Top:SetHeight(pixelSize)
-
-        b.Bottom:ClearAllPoints()
-        b.Bottom:SetPoint("BOTTOMLEFT", self, "BOTTOMLEFT", 0, 0)
-        b.Bottom:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", 0, 0)
-        b.Bottom:SetHeight(pixelSize)
-
-        -- Left/Right: Inset by Top/Bottom height
-        b.Left:ClearAllPoints()
-        b.Left:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -pixelSize)
-        b.Left:SetPoint("BOTTOMLEFT", self, "BOTTOMLEFT", 0, pixelSize)
-        b.Left:SetWidth(pixelSize)
-
-        b.Right:ClearAllPoints()
-        b.Right:SetPoint("TOPRIGHT", self, "TOPRIGHT", 0, -pixelSize)
-        b.Right:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", 0, pixelSize)
-        b.Right:SetWidth(pixelSize)
-
-        -- Handle Bar Inset (use calculated pixelSize)
+        -- Handle Bar Inset (use calculated pixelSize from Skin)
+        local pixelSize = self.borderPixelSize or 1
         local bar = self.orbitBar or self.Bar
         if bar then
             bar:ClearAllPoints()

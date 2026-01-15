@@ -62,7 +62,7 @@ local function UpdateFrameLayout(frame, borderSize)
     end -- Guard against uninitialized height
 
     local powerHeight = height * (POWER_BAR_HEIGHT_RATIO or 0.2)
-    local inset = math.max(1, borderSize or 1) -- Ensure minimal inset
+    local inset = math.max(1, borderSize) -- Ensure minimal inset
 
     if frame.Power then
         frame.Power:ClearAllPoints()
@@ -236,7 +236,7 @@ local function UpdateDebuffs(frame, plugin)
     end
 
     -- Prepare Skin Settings
-    local globalBorder = plugin:GetPlayerSetting("BorderSize") or 1
+    local globalBorder = plugin:GetPlayerSetting("BorderSize")
     local skinSettings = {
         zoom = 0, -- Inherit/Default
         borderStyle = 1, -- Pixel Perfect
@@ -308,56 +308,7 @@ local function CreateBossCastBar(parent, bossIndex, plugin)
 
     -- Pixel-perfect SetBorder helper
     bar.SetBorder = function(self, size)
-        -- Use Pixel Engine
-        local pixelScale = (Orbit.Engine.Pixel and Orbit.Engine.Pixel:GetScale())
-            or (768.0 / (select(2, GetPhysicalScreenSize()) or 768.0))
-
-        local scale = self:GetEffectiveScale()
-        if not scale or scale < 0.01 then
-            scale = 1
-        end
-
-        local mult = pixelScale / scale
-        local pixelSize = (size or 1) * mult
-
-        -- Create borders if needed
-        if not self.Borders then
-            self.Borders = {}
-            local function CreateLine()
-                local t = self:CreateTexture(nil, "BORDER")
-                t:SetColorTexture(0, 0, 0, 1)
-                return t
-            end
-            self.Borders.Top = CreateLine()
-            self.Borders.Bottom = CreateLine()
-            self.Borders.Left = CreateLine()
-            self.Borders.Right = CreateLine()
-        end
-
-        local b = self.Borders
-
-        -- Non-overlapping Layout
-        -- Top/Bottom: Full Width
-        b.Top:ClearAllPoints()
-        b.Top:SetPoint("TOPLEFT", self, "TOPLEFT", 0, 0)
-        b.Top:SetPoint("TOPRIGHT", self, "TOPRIGHT", 0, 0)
-        b.Top:SetHeight(pixelSize)
-
-        b.Bottom:ClearAllPoints()
-        b.Bottom:SetPoint("BOTTOMLEFT", self, "BOTTOMLEFT", 0, 0)
-        b.Bottom:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", 0, 0)
-        b.Bottom:SetHeight(pixelSize)
-
-        -- Left/Right: Inset by Top/Bottom height
-        b.Left:ClearAllPoints()
-        b.Left:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -pixelSize)
-        b.Left:SetPoint("BOTTOMLEFT", self, "BOTTOMLEFT", 0, pixelSize)
-        b.Left:SetWidth(pixelSize)
-
-        b.Right:ClearAllPoints()
-        b.Right:SetPoint("TOPRIGHT", self, "TOPRIGHT", 0, -pixelSize)
-        b.Right:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", 0, pixelSize)
-        b.Right:SetWidth(pixelSize)
+        Orbit.Skin:SkinBorder(self, self, size)
     end
 
     -- Apply default border
@@ -552,7 +503,7 @@ local function CreateBossFrame(bossIndex, plugin)
     frame:SetFrameStrata("MEDIUM")
     frame:SetFrameLevel(50 + bossIndex)
 
-    UpdateFrameLayout(frame)
+    UpdateFrameLayout(frame, plugin:GetPlayerSetting("BorderSize"))
 
     -- Create power bar
     frame.Power = CreatePowerBar(frame, unit, plugin)
@@ -567,7 +518,7 @@ local function CreateBossFrame(bossIndex, plugin)
     frame:SetScript("OnShow", function(self)
         self:UpdateAll()
         UpdatePowerBar(self)
-        UpdateFrameLayout(self, self.borderSize or 1) -- Ensure layout is correct on show
+        UpdateFrameLayout(self, plugin:GetPlayerSetting("BorderSize")) -- Ensure layout is correct on show
         UpdateDebuffs(self, plugin)
     end)
 

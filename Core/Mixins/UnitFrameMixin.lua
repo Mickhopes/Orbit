@@ -29,9 +29,6 @@ function Mixin:GetPlayerSetting(key)
 end
 
 -- [ NATIVE FRAME HIDING ]----------------------------------------------------------------------------
-
--- Hide a native Blizzard unit frame (Target/Focus/Pet) by parenting to a hidden container
--- This is a DRY helper to consolidate the repeated pattern across unit frame plugins
 function Mixin:HideNativeUnitFrame(nativeFrame, hiddenParentName)
     local hiddenParent = CreateFrame("Frame", hiddenParentName, UIParent)
     hiddenParent:Hide()
@@ -154,10 +151,6 @@ function Mixin:ApplyBaseVisuals(frame, systemIndex, options)
         if healthTextEnabled == nil then
             healthTextEnabled = true
         end
-
-        -- Backdrop Colour is ALWAYS global (enforced in PluginMixin),
-        -- but access via PlayerFrame ensures inheritance logic flows if we ever localise it.
-        -- For now, calling UpdateBackdropColor uses simple GetSetting which handles global fallback.
     else
         -- PlayerFrame uses its own settings
         borderSize = self:GetSetting(systemIndex, "BorderSize")
@@ -214,7 +207,6 @@ function Mixin:CreateVisibilityContainer(parent)
     container:SetAllPoints() -- Fill parent (usually UIParent) so children anchor relative to screen
 
     -- Standard driver for Pet Battle (hides frames)
-    -- Note: Removed [vehicleui] so UnitFrames remain visible in vehicles (Player/Target/Focus)
     RegisterStateDriver(container, "visibility", "[petbattle] hide; show")
 
     return container

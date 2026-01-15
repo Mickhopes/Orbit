@@ -104,6 +104,9 @@ function Plugin:OnLoad()
     -- Container for reparented Blizzard debuff frames
     Frame = CreateFrame("Frame", "OrbitTargetDebuffsFrame", UIParent)
     Frame:SetSize(200, 20)
+    if OrbitEngine.Pixel then
+        OrbitEngine.Pixel:Enforce(Frame)
+    end
 
     RegisterUnitWatch(Frame)
 

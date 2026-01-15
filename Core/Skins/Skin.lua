@@ -55,6 +55,18 @@ function Skin:SkinBorder(frame, backdrop, size, color)
         return
     end
 
+    local targetSize = size
+
+    -- Handle Hidden/Zero Border
+    if targetSize <= 0 then
+        if backdrop.Borders then
+            for _, border in pairs(backdrop.Borders) do
+                border:Hide()
+            end
+        end
+        return true
+    end
+
     local pixelScale = self:GetPixelScale()
     local scale = frame:GetEffectiveScale()
     if not scale or scale < 0.01 then
@@ -62,14 +74,14 @@ function Skin:SkinBorder(frame, backdrop, size, color)
     end
 
     local mult = pixelScale / scale
-    local pixelSize = (size or 1) * mult
+    local pixelSize = targetSize * mult
     frame.borderPixelSize = pixelSize -- Store for Anchor:ApplyAnchorPosition
 
     -- Create borders if needed
     if not backdrop.Borders then
         backdrop.Borders = {}
         local function CreateLine()
-            local t = backdrop:CreateTexture(nil, "BORDER")
+            local t = backdrop:CreateTexture(nil, "OVERLAY")
             t:SetColorTexture(1, 1, 1, 1) -- Set white initially, tinted by color arg
             return t
         end
@@ -93,34 +105,34 @@ function Skin:SkinBorder(frame, backdrop, size, color)
     local c = color or { r = 0, g = 0, b = 0, a = 1 }
     for _, t in pairs(backdrop.Borders) do
         t:SetColorTexture(c.r, c.g, c.b, c.a)
+        t:Show() -- Ensure visible
     end
 
     local b = backdrop.Borders
 
     -- Non-overlapping Layout
-    -- Since 'backdrop' frame is SetAllPoints to 'frame', we anchor relative to 'backdrop'
-
-    -- Top/Bottom: Full Width
-    b.Top:ClearAllPoints()
-    b.Top:SetPoint("TOPLEFT", backdrop, "TOPLEFT", 0, 0)
-    b.Top:SetPoint("TOPRIGHT", backdrop, "TOPRIGHT", 0, 0)
-    b.Top:SetHeight(pixelSize)
-
-    b.Bottom:ClearAllPoints()
-    b.Bottom:SetPoint("BOTTOMLEFT", backdrop, "BOTTOMLEFT", 0, 0)
-    b.Bottom:SetPoint("BOTTOMRIGHT", backdrop, "BOTTOMRIGHT", 0, 0)
-    b.Bottom:SetHeight(pixelSize)
-
-    -- Left/Right: Inset by Top/Bottom height
+    -- Left/Right: Full Height (Priority)
     b.Left:ClearAllPoints()
-    b.Left:SetPoint("TOPLEFT", backdrop, "TOPLEFT", 0, -pixelSize)
-    b.Left:SetPoint("BOTTOMLEFT", backdrop, "BOTTOMLEFT", 0, pixelSize)
+    b.Left:SetPoint("TOPLEFT", backdrop, "TOPLEFT", 0, 0)
+    b.Left:SetPoint("BOTTOMLEFT", backdrop, "BOTTOMLEFT", 0, 0)
     b.Left:SetWidth(pixelSize)
 
     b.Right:ClearAllPoints()
-    b.Right:SetPoint("TOPRIGHT", backdrop, "TOPRIGHT", 0, -pixelSize)
-    b.Right:SetPoint("BOTTOMRIGHT", backdrop, "BOTTOMRIGHT", 0, pixelSize)
+    b.Right:SetPoint("TOPRIGHT", backdrop, "TOPRIGHT", 0, 0)
+    b.Right:SetPoint("BOTTOMRIGHT", backdrop, "BOTTOMRIGHT", 0, 0)
     b.Right:SetWidth(pixelSize)
+
+    -- Top/Bottom: Inset by Left/Right width
+    b.Top:ClearAllPoints()
+    b.Top:SetPoint("TOPLEFT", backdrop, "TOPLEFT", pixelSize, 0)
+    b.Top:SetPoint("TOPRIGHT", backdrop, "TOPRIGHT", -pixelSize, 0)
+    b.Top:SetHeight(pixelSize)
+
+    b.Bottom:ClearAllPoints()
+    b.Bottom:SetPoint("BOTTOMLEFT", backdrop, "BOTTOMLEFT", pixelSize, 0)
+    b.Bottom:SetPoint("BOTTOMRIGHT", backdrop, "BOTTOMRIGHT", -pixelSize, 0)
+    b.Bottom:SetHeight(pixelSize)
+    return false
 end
 
 -- -------------------------------------------------------------------------- --

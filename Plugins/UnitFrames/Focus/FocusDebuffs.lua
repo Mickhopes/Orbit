@@ -103,6 +103,9 @@ end
 function Plugin:OnLoad()
     Frame = CreateFrame("Frame", "OrbitFocusDebuffsFrame", UIParent)
     Frame:SetSize(200, 40)
+    if OrbitEngine.Pixel then
+        OrbitEngine.Pixel:Enforce(Frame)
+    end
 
     RegisterUnitWatch(Frame)
 

@@ -235,6 +235,22 @@ function Orbit:OnLoad()
 
     self:InitializePlugins()
 
+    -- Listen for Screen Resolution changes (Pixel Perfect Border Update)
+    if self.EventBus then
+        self.EventBus:On("ORBIT_DISPLAY_SIZE_CHANGED", function()
+            -- Force re-application of settings to update pixel-perfect borders
+            if self.Engine and self.Engine.systems then
+                for _, plugin in ipairs(self.Engine.systems) do
+                    if plugin.ApplyAll then
+                        plugin:ApplyAll()
+                    elseif plugin.ApplySettings then
+                        plugin:ApplySettings()
+                    end
+                end
+            end
+        end)
+    end
+
     self:Print("loaded. Type /orbit for config")
 end
 

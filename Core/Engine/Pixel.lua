@@ -16,6 +16,10 @@ local function UpdateScreenScale()
     else
         SCREEN_SCALE = 768.0 / physicalHeight
     end
+    
+    if Orbit.EventBus then
+        Orbit.EventBus:Fire("ORBIT_DISPLAY_SIZE_CHANGED", SCREEN_SCALE)
+    end
 end
 
 -- Hook event frame to update scale when resolution changes
@@ -61,8 +65,6 @@ function Pixel:Enforce(frame)
     if not frame then
         return
     end
-
-    -- Use specific keys to avoid collision with other addons using generic "NativeSetWidth"
 
     if not frame.OrbitNativeSetWidth then
         frame.OrbitNativeSetWidth = frame.SetWidth

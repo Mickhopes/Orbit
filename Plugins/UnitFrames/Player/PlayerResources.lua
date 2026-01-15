@@ -174,67 +174,11 @@ function Plugin:OnLoad()
         Frame.StatusBar:SetValue(0)
         Frame.StatusBar:SetStatusBarTexture(LSM:Fetch("statusbar", "Melli"))
 
-        -- Add SetBorder helper to container
-        Frame.StatusBarContainer.SetBorder = function(self, size)
-            -- Use Pixel Engine
-            local pixelScale = (Orbit.Engine.Pixel and Orbit.Engine.Pixel:GetScale())
-                or (768.0 / (select(2, GetPhysicalScreenSize()) or 768.0))
-
-            local scale = self:GetEffectiveScale()
-            if not scale or scale < 0.01 then
-                scale = 1
-            end
-
-            local mult = pixelScale / scale
-            local pixelSize = (size or 1) * mult
-
-            -- Create borders if needed
-            if not self.Borders then
-                self.Borders = {}
-                local function CreateLine()
-                    local t = self:CreateTexture(nil, "BORDER")
-                    t:SetColorTexture(0, 0, 0, 1)
-                    return t
-                end
-                self.Borders.Top = CreateLine()
-                self.Borders.Bottom = CreateLine()
-                self.Borders.Left = CreateLine()
-                self.Borders.Right = CreateLine()
-            end
-
-            local b = self.Borders
-
-            -- Non-overlapping Layout
-            -- Top/Bottom: Full Width
-            b.Top:ClearAllPoints()
-            b.Top:SetPoint("TOPLEFT", self, "TOPLEFT", 0, 0)
-            b.Top:SetPoint("TOPRIGHT", self, "TOPRIGHT", 0, 0)
-            b.Top:SetHeight(pixelSize)
-
-            b.Bottom:ClearAllPoints()
-            b.Bottom:SetPoint("BOTTOMLEFT", self, "BOTTOMLEFT", 0, 0)
-            b.Bottom:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", 0, 0)
-            b.Bottom:SetHeight(pixelSize)
-
-            -- Left/Right: Inset by Top/Bottom height
-            b.Left:ClearAllPoints()
-            b.Left:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -pixelSize)
-            b.Left:SetPoint("BOTTOMLEFT", self, "BOTTOMLEFT", 0, pixelSize)
-            b.Left:SetWidth(pixelSize)
-
-            b.Right:ClearAllPoints()
-            b.Right:SetPoint("TOPRIGHT", self, "TOPRIGHT", 0, -pixelSize)
-            b.Right:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", 0, pixelSize)
-            b.Right:SetWidth(pixelSize)
-
-            -- Inset the StatusBar
-            Frame.StatusBar:ClearAllPoints()
-            Frame.StatusBar:SetPoint("TOPLEFT", pixelSize, -pixelSize)
-            Frame.StatusBar:SetPoint("BOTTOMRIGHT", -pixelSize, pixelSize)
-        end
-
-        -- Apply default border
-        Frame.StatusBarContainer:SetBorder(1)
+        -- Apply default border using ClassBar skin
+        Orbit.Skin.ClassBar:SkinStatusBar(Frame.StatusBarContainer, Frame.StatusBar, { 
+            borderSize = 1, 
+            texture = "Melli" 
+        })
     end
 
     -- Support for mergeBorders (propagate to StatusBarContainer if active)
@@ -346,7 +290,11 @@ function Plugin:ApplySettings()
     local width = self:GetSetting(systemIndex, "Width")
     local height = self:GetSetting(systemIndex, "Height")
     local borderSize = self:GetSetting(systemIndex, "BorderSize")
-    local spacing = borderSize or 1
+    if not borderSize and Orbit.db.GlobalSettings then
+        borderSize = Orbit.db.GlobalSettings.BorderSize
+    end
+    borderSize = borderSize or 1
+    local spacing = borderSize
     local texture = self:GetSetting(systemIndex, "Texture")
     local fontName = self:GetSetting(systemIndex, "Font")
     local showText = self:GetSetting(systemIndex, "ShowText")
@@ -394,10 +342,18 @@ function Plugin:ApplySettings()
     -- 1. Update Layout (Physical)
     self:UpdateLayout(Frame)
 
-    -- [ NEW ] Apply Visuals to Single Bar Container
+    -- Apply Visuals to Single Bar Container
     if Frame.StatusBarContainer and Frame.StatusBarContainer:IsShown() then
-        Orbit.Skin:SkinStatusBar(Frame.StatusBar, texture)
-        Frame.StatusBarContainer:SetBorder(borderSize)
+        local bgColor = self:GetSetting(systemIndex, "BackdropColour")
+        if not bgColor and Orbit.db.GlobalSettings then
+            bgColor = Orbit.db.GlobalSettings.BackdropColour
+        end
+        
+        Orbit.Skin.ClassBar:SkinStatusBar(Frame.StatusBarContainer, Frame.StatusBar, {
+            borderSize = borderSize,
+            texture = texture,
+            backColor = bgColor
+        })
     end
 
     -- 2. Restore Position (must happen AFTER layout for anchored frames)
@@ -416,7 +372,7 @@ function Plugin:ApplyButtonVisuals()
         return
     end
 
-    local borderSize = self:GetSetting(SYSTEM_INDEX, "BorderSize")
+    local borderSize = (Frame.settings and Frame.settings.borderSize) or 1
     local texture = self:GetSetting(SYSTEM_INDEX, "Texture")
 
     local _, class = UnitClass("player")
@@ -547,9 +503,6 @@ function Plugin:UpdateVisibility()
     Frame.orbitDisabled = false
     -- If enabled, we delegate to UpdatePowerType to decide if we valid resources to show
     self:UpdatePowerType()
-
-    -- If UpdatePowerType decided we should show, ensure we are shown
-    -- UpdatePowerType handles the :Show() / :Hide() based on resource availability
 end
 
 -- [ POWER LOGIC ]----------------------------------------------------------------------------------
@@ -612,14 +565,14 @@ function Plugin:SetContinuousMode(isContinuous)
         if Frame.StatusBarContainer then
             Frame.StatusBarContainer:Show()
 
-            -- Apply texture
-            -- Apply texture
+            -- Apply texture and border using ClassBar skin
             local texture = self:GetSetting(SYSTEM_INDEX, "Texture")
-            Orbit.Skin:SkinStatusBar(Frame.StatusBar, texture)
-
-            -- Apply border
-            local borderSize = self:GetSetting(SYSTEM_INDEX, "BorderSize") or 1
-            Frame.StatusBarContainer:SetBorder(borderSize)
+            local borderSize = (Frame.settings and Frame.settings.borderSize) or 1
+            
+            Orbit.Skin.ClassBar:SkinStatusBar(Frame.StatusBarContainer, Frame.StatusBar, {
+                borderSize = borderSize,
+                texture = texture
+            })
         end
 
         for _, btn in ipairs(Frame.buttons or {}) do
@@ -720,7 +673,6 @@ function Plugin:UpdateMaxPower()
                 end
             end
         end
-        -- Visibility managed by UpdatePower
     end
 
     self:ApplySettings()
@@ -752,6 +704,13 @@ function Plugin:UpdateLayout(frame)
     local totalSpacing = (max - 1) * spacing
     local btnWidth = (totalWidth - totalSpacing) / max
 
+    if OrbitEngine.Pixel then
+        local scale = Frame:GetEffectiveScale()
+        btnWidth = OrbitEngine.Pixel:Snap(btnWidth, scale)
+        height = OrbitEngine.Pixel:Snap(height, scale)
+        spacing = OrbitEngine.Pixel:Snap(spacing, scale)
+    end
+
     -- Physical Updates
     Frame:SetHeight(height)
 
@@ -779,9 +738,8 @@ function Plugin:UpdatePower()
 
     -- [ CONTINUOUS RESOURCES ]--------------------------------------------------------------------------
     if self.continuousResource then
-        -- ----------------------------------------
+
         -- STAGGER (Brewmaster Monk)
-        -- ----------------------------------------
         if self.continuousResource == "STAGGER" then
             local stagger, maxHealth, percent, level = ResourceMixin:GetStaggerState()
 
@@ -800,9 +758,7 @@ function Plugin:UpdatePower()
             return
         end
 
-        -- ----------------------------------------
         -- SOUL FRAGMENTS (Demon Hunter)
-        -- ----------------------------------------
         if self.continuousResource == "SOUL_FRAGMENTS" then
             local current, max, isVoidMeta = ResourceMixin:GetSoulFragmentsState()
 
@@ -823,9 +779,7 @@ function Plugin:UpdatePower()
             return
         end
 
-        -- ----------------------------------------
         -- EBON MIGHT (Augmentation Evoker)
-        -- ----------------------------------------
         if self.continuousResource == "EBON_MIGHT" then
             local current, max = ResourceMixin:GetEbonMightState()
 
@@ -846,9 +800,7 @@ function Plugin:UpdatePower()
             return
         end
 
-        -- ----------------------------------------
         -- MANA (Shadow Priest, Ele/Enh Shaman, Balance Druid)
-        -- ----------------------------------------
         if self.continuousResource == "MANA" then
             local current = UnitPower("player", Enum.PowerType.Mana)
             local max = UnitPowerMax("player", Enum.PowerType.Mana)
@@ -877,7 +829,7 @@ function Plugin:UpdatePower()
             return
         end
 
-        return -- Unknown continuous resource
+        return
     end
 
     -- [ DISCRETE RESOURCES ]----------------------------------------------------------------------------
@@ -1040,6 +992,9 @@ function Plugin:UpdatePower()
 
     -- Snap helper: rounds position to nearest physical pixel
     local function SnapToPixel(value)
+        if OrbitEngine.Pixel then
+            return OrbitEngine.Pixel:Snap(value, scale)
+        end
         return math.floor(value * scale + 0.5) / scale
     end
 
@@ -1051,7 +1006,7 @@ function Plugin:UpdatePower()
         for i = 1, 10 do
             local sp = Frame.Spacers[i]
             if sp then
-                if i < max then
+                if i < max and snappedSpacerWidth > 0 then
                     sp:Show()
                     sp:ClearAllPoints()
                     sp:SetWidth(snappedSpacerWidth)

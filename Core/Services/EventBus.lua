@@ -19,7 +19,8 @@ local eventFrame = CreateFrame("Frame")
 function EventBus:On(event, callback, context)
     if not self.listeners[event] then
         self.listeners[event] = {}
-        eventFrame:RegisterEvent(event)
+        -- Try to register as native event, ignore failure (custom events)
+        pcall(eventFrame.RegisterEvent, eventFrame, event)
     end
 
     local listener = {

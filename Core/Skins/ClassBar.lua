@@ -40,10 +40,6 @@ function ClassBar:SkinButton(btn, settings)
     btn.orbitBar:SetTexture(texture)
     local bg = Orbit.Constants.Colors.Background
     btn.orbitBg:SetColorTexture(bg.r, bg.g, bg.b, bg.a)
-
-    -- Color Logic (Class Color)
-    -- If settings has color override, use it, otherwise use class color?
-    -- Plugin handles color typically, but here we can default to white (plugin sets vertex color)
     btn.orbitBar:SetVertexColor(1, 1, 1)
 
     -- HIDE NATIVE ART
@@ -62,4 +58,48 @@ function ClassBar:SkinButton(btn, settings)
             btn.Cooldown:SetFrameLevel(btn:GetFrameLevel() + 2)
         end
     end
+end
+
+function ClassBar:SkinStatusBar(container, bar, settings)
+    if not container or not bar then
+        return
+    end
+
+    -- 1. Create Layers if missing
+    if not container.orbitRg then
+        container.orbitRg = true
+
+        -- Background (Inactive/Empty) - Applied to Container
+        if not container.orbitBg then
+            container.orbitBg = container:CreateTexture(nil, "BACKGROUND")
+            container.orbitBg:SetAllPoints(container)
+        end
+
+        -- Backdrop Frame for Border
+        if not container.orbitBackdrop then
+            container.orbitBackdrop = Skin:CreateBackdrop(container, nil)
+            container.orbitBackdrop:SetFrameLevel(container:GetFrameLevel() + 5)
+        end
+    end
+
+    -- Update Backdrop (Dynamic Size)
+    local borderSize = settings.borderSize or 1
+    Skin:SkinBorder(container, container.orbitBackdrop, borderSize, { r = 0, g = 0, b = 0, a = 1 })
+
+    -- Setup Textures
+    if settings.texture then
+        local texture = LSM:Fetch("statusbar", settings.texture)
+        bar:SetStatusBarTexture(texture)
+    end
+
+    -- Background Color
+    local bg = Orbit.Constants.Colors.Background
+    if settings.backColor then
+        bg = settings.backColor
+    end
+    container.orbitBg:SetColorTexture(bg.r, bg.g, bg.b, bg.a)
+
+    -- Ensure Bar Fills Container (No Inset)
+    bar:ClearAllPoints()
+    bar:SetAllPoints(container)
 end

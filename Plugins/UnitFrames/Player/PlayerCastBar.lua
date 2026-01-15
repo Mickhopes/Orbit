@@ -42,6 +42,21 @@ local function GetAnchorAxis(frame)
     return OrbitEngine.Frame:GetAnchorAxis(frame)
 end
 
+-- Helper: Snap value to pixel grid
+local function SnapToPixel(value, scale)
+    if OrbitEngine.Pixel then
+        return OrbitEngine.Pixel:Snap(value, scale)
+    end
+    return value
+end
+
+-- Helper: Calculate spark position for a value on a bar
+local function CalculateSparkPos(bar, value, maxValue)
+    local width = bar:GetWidth()
+    local pos = (maxValue > 0) and ((value / maxValue) * width) or 0
+    return SnapToPixel(pos, bar:GetEffectiveScale())
+end
+
 -------------------------------------------------
 -- SETTINGS UI
 -------------------------------------------------
@@ -131,14 +146,15 @@ function Plugin:AddSettings(dialog, systemFrame, forceAnchorMode)
     Orbit.Config:Render(dialog, systemFrame, self, schema)
 end
 
--------------------------------------------------
--- LOGIC
--------------------------------------------------
+-- [ LOGIC ]-----------------------------------------------------------------------------------------
 function Plugin:OnLoad()
     -- Create frame ONLY when plugin is enabled (OnLoad is only called for enabled plugins)
     CastBar = CreateFrame("StatusBar", "OrbitCastBar", UIParent)
     CastBar:SetSize(Orbit.Constants.PlayerCastBar.DefaultWidth, Orbit.Constants.PlayerCastBar.DefaultHeight)
     CastBar:SetPoint("CENTER", 0, Orbit.Constants.PlayerCastBar.DefaultY)
+    if OrbitEngine.Pixel then
+        OrbitEngine.Pixel:Enforce(CastBar)
+    end
     CastBar:SetFrameStrata("MEDIUM")
     CastBar:SetFrameLevel(100)
     CastBar:SetStatusBarTexture("")
@@ -256,9 +272,7 @@ function Plugin:OnLoad()
     end, self)
 end
 
--------------------------------------------------
--- SKINNING LOGIC
--------------------------------------------------
+-- [ SKINNING LOGIC ]---------------------------------------------------------------------------------
 
 function Plugin:OnCastEvent(event, unit, castGUID, spellID)
     if unit ~= "player" then
@@ -294,10 +308,11 @@ function Plugin:OnCastEvent(event, unit, castGUID, spellID)
             -- Latency
             if bar.Latency then
                 bar.Latency:Hide()
-            end -- Hide any stale latency
+            end
             local _, _, _, latency = GetNetStats()
             if bar.Latency and latency and bar.maxValue > 0 then
                 local width = math.min(latency / 1000 / bar.maxValue, 1) * bar:GetWidth()
+                width = SnapToPixel(width, bar:GetEffectiveScale())
                 bar.Latency:ClearAllPoints()
                 bar.Latency:SetWidth(math.max(width, 1))
                 bar.Latency:SetPoint("RIGHT", bar, "RIGHT", 0, 0)
@@ -329,10 +344,11 @@ function Plugin:OnCastEvent(event, unit, castGUID, spellID)
             -- Latency for channels (left side for "safe to clip")
             if bar.Latency then
                 bar.Latency:Hide()
-            end -- Hide any stale latency
+            end
             local _, _, _, latency = GetNetStats()
             if bar.Latency and latency and bar.maxValue > 0 then
                 local width = math.min(latency / 1000 / bar.maxValue, 1) * bar:GetWidth()
+                width = SnapToPixel(width, bar:GetEffectiveScale())
                 bar.Latency:ClearAllPoints()
                 bar.Latency:SetWidth(math.max(width, 1))
                 bar.Latency:SetPoint("LEFT", bar, "LEFT", 0, 0)
@@ -512,8 +528,7 @@ function Plugin:OnUpdate(elapsed)
             bar:Hide()
         else
             targetBar:SetValue(value)
-            local width = bar:GetWidth()
-            local sparkPos = (bar.maxValue > 0) and ((value / bar.maxValue) * width) or 0
+            local sparkPos = CalculateSparkPos(bar, value, bar.maxValue)
             if bar.Spark then
                 bar.Spark:SetPoint("CENTER", bar, "LEFT", sparkPos, 0)
             end
@@ -528,8 +543,7 @@ function Plugin:OnUpdate(elapsed)
             bar:Hide()
         else
             targetBar:SetValue(value)
-            local width = bar:GetWidth()
-            local sparkPos = (bar.maxValue > 0) and ((value / bar.maxValue) * width) or 0
+            local sparkPos = CalculateSparkPos(bar, value, bar.maxValue)
             if bar.Spark then
                 bar.Spark:SetPoint("CENTER", bar, "LEFT", sparkPos, 0)
             end
@@ -545,8 +559,7 @@ function Plugin:OnUpdate(elapsed)
         end
 
         targetBar:SetValue(value)
-        local width = bar:GetWidth()
-        local sparkPos = (bar.maxValue > 0) and ((value / bar.maxValue) * width) or 0
+        local sparkPos = CalculateSparkPos(bar, value, bar.maxValue)
         if bar.Spark then
             bar.Spark:SetPoint("CENTER", bar, "LEFT", sparkPos, 0)
         end
@@ -690,9 +703,7 @@ function Plugin:ShowPreview()
     bar:Show()
 end
 
--------------------------------------------------
--- EMPOWER HELPERS
--------------------------------------------------
+-- [ EMPOWER HELPERS ]---------------------------------------------------------------------------------
 function Plugin:SetupEmpowerMarkers(bar, numStages)
     local orbitBar = bar.orbitBar
     if not orbitBar or not orbitBar.stageMarkers then
@@ -712,6 +723,7 @@ function Plugin:SetupEmpowerMarkers(bar, numStages)
         local marker = orbitBar.stageMarkers[i]
         if marker and bar.stageDurations[i] and bar.maxValue > 0 then
             local xPos = (bar.stageDurations[i] / bar.maxValue) * width
+            xPos = SnapToPixel(xPos, bar:GetEffectiveScale())
             marker:ClearAllPoints()
             marker:SetPoint("LEFT", orbitBar, "LEFT", xPos, 0)
             marker:SetHeight(height)

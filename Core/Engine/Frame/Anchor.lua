@@ -161,6 +161,11 @@ local function ApplyAnchorPosition(child, parent, edge, padding, align, syncOpti
         end
     end
 
+    -- Snap padding to physical pixels
+    if Orbit.Engine.Pixel then
+        padding = Orbit.Engine.Pixel:Snap(padding, child:GetEffectiveScale())
+    end
+
     if edge == "BOTTOM" then
         if align == "LEFT" then
             child:SetPoint("TOPLEFT", parent, "BOTTOMLEFT", 0, -padding + overlap)

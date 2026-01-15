@@ -432,59 +432,23 @@ function UnitButtonMixin:SetBorderHidden(edge, hidden)
 end
 
 function UnitButtonMixin:SetBorder(size)
-    -- Calculation: Convert desired physical pixels (size) to frame-local units
-    -- Use new Pixel Engine (or fallback during init)
-    local pixelScale = (Orbit.Engine.Pixel and Orbit.Engine.Pixel:GetScale())
-        or (768.0 / (select(2, GetPhysicalScreenSize()) or 768.0))
-
-    local scale = self:GetEffectiveScale()
-    if not scale or scale < 0.01 then
-        scale = 1
-    end
-
-    local mult = pixelScale / scale
-    local pixelSize = (size or 1) * mult
-    self.borderPixelSize = pixelSize
-
-    -- Create borders if needed
-    if not self.Borders then
-        self.Borders = {}
-        local function CreateLine()
-            local t = self:CreateTexture(nil, "BORDER")
-            t:SetColorTexture(0, 0, 0, 1)
-            return t
+    -- Delegate to Skin Engine
+    if Orbit.Skin:SkinBorder(self, self, size) then
+        self.borderPixelSize = 0
+        if self.Health then
+            self.Health:ClearAllPoints()
+            self.Health:SetPoint("TOPLEFT", 0, 0)
+            self.Health:SetPoint("BOTTOMRIGHT", 0, 0)
         end
-        self.Borders.Top = CreateLine()
-        self.Borders.Bottom = CreateLine()
-        self.Borders.Left = CreateLine()
-        self.Borders.Right = CreateLine()
+        if self.HealthDamageBar then
+            self.HealthDamageBar:ClearAllPoints()
+            self.HealthDamageBar:SetAllPoints(self.Health)
+        end
+        return
     end
 
-    local b = self.Borders
-
-    -- Non-overlapping Layout
-    -- Top/Bottom: Full Width
-    b.Top:ClearAllPoints()
-    b.Top:SetPoint("TOPLEFT", self, "TOPLEFT", 0, 0)
-    b.Top:SetPoint("TOPRIGHT", self, "TOPRIGHT", 0, 0)
-    b.Top:SetHeight(pixelSize)
-
-    b.Bottom:ClearAllPoints()
-    b.Bottom:SetPoint("BOTTOMLEFT", self, "BOTTOMLEFT", 0, 0)
-    b.Bottom:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", 0, 0)
-    b.Bottom:SetHeight(pixelSize)
-
-    -- Left/Right: Inset by Top/Bottom height
-    b.Left:ClearAllPoints()
-    b.Left:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -pixelSize)
-    b.Left:SetPoint("BOTTOMLEFT", self, "BOTTOMLEFT", 0, pixelSize)
-    b.Left:SetWidth(pixelSize)
-
-    b.Right:ClearAllPoints()
-    b.Right:SetPoint("TOPRIGHT", self, "TOPRIGHT", 0, -pixelSize)
-    b.Right:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", 0, pixelSize)
-    b.Right:SetWidth(pixelSize)
-
+    local pixelSize = self.borderPixelSize or 1
+    
     -- Resize DamageBar (behind Health)
     if self.HealthDamageBar then
         self.HealthDamageBar:ClearAllPoints()
@@ -639,32 +603,7 @@ function UnitButton:Create(parent, unit, name)
         f.HealAbsorbMask:Hide()
     end)
 
-    -- Divider: "Complex" shadow separator
-    -- Divider: "Complex" shadow separator
-    -- Converted to Frames (with texture inside) to respect SetClipsChildren on the Mask
-    -- This ensures they disappear when the Mask has 0 width (Value = 0)
-
-    -- Component 1: The Hard Stop (1px Black Line)
-    f.HealAbsorbLeftShadow2 = CreateFrame("Frame", nil, f.HealAbsorbMask)
-    f.HealAbsorbLeftShadow2:SetSize(1, 30) -- Height is arbitrary as anchors override it, but width 1 is key
-    f.HealAbsorbLeftShadow2:SetPoint("TOPLEFT", f.HealAbsorbMask, "TOPLEFT", 0, 0)
-    f.HealAbsorbLeftShadow2:SetPoint("BOTTOMLEFT", f.HealAbsorbMask, "BOTTOMLEFT", 0, 0)
-
-    f.HealAbsorbLeftShadow2.tex = f.HealAbsorbLeftShadow2:CreateTexture(nil, "OVERLAY")
-    f.HealAbsorbLeftShadow2.tex:SetAllPoints()
-    f.HealAbsorbLeftShadow2.tex:SetColorTexture(0, 0, 0, 1)
-
-    -- Component 2: The Soft Fade (Black Shadow)
-    f.HealAbsorbLeftShadow = CreateFrame("Frame", nil, f.HealAbsorbMask)
-    f.HealAbsorbLeftShadow:SetSize(5, 30)
-    f.HealAbsorbLeftShadow:SetPoint("TOPLEFT", f.HealAbsorbLeftShadow2, "TOPRIGHT", 0, 0)
-    f.HealAbsorbLeftShadow:SetPoint("BOTTOMLEFT", f.HealAbsorbLeftShadow2, "BOTTOMRIGHT", 0, 0)
-
-    f.HealAbsorbLeftShadow.tex = f.HealAbsorbLeftShadow:CreateTexture(nil, "OVERLAY")
-    f.HealAbsorbLeftShadow.tex:SetAllPoints()
-    f.HealAbsorbLeftShadow.tex:SetColorTexture(1, 1, 1, 1)
-    f.HealAbsorbLeftShadow.tex:SetGradient("HORIZONTAL", CreateColor(0, 0, 0, 0.5), CreateColor(0, 0, 0, 0))
-    f.HealAbsorbLeftShadow.tex:SetBlendMode("BLEND")
+    -- Divider removed by user request.
     -- Text Frame to ensure text sits ABOVE absorbs
     f.TextFrame = CreateFrame("Frame", nil, f.Health)
     f.TextFrame:SetAllPoints(f.Health)

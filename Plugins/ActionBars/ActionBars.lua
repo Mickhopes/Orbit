@@ -722,6 +722,11 @@ function Plugin:LayoutButtons(index)
                 button:ClearAllPoints()
 
                 local x, y = OrbitEngine.Layout:ComputeGridPosition(i, limitPerLine, orientation, w, h, padding)
+                -- Force pixel snap for button position within container
+                if OrbitEngine.Pixel then
+                     x = OrbitEngine.Pixel:Snap(x, button:GetEffectiveScale())
+                     y = OrbitEngine.Pixel:Snap(y, button:GetEffectiveScale())
+                end
                 button:SetPoint("TOPLEFT", container, "TOPLEFT", x, y)
             end
         end
