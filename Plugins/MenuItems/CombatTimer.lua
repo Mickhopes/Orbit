@@ -32,7 +32,7 @@ function Plugin:AddSettings(dialog, systemFrame)
         label = "Scale",
         default = 100,
         min = 80,
-        max = 120,
+        max = 300,
     })
 
     -- 2. Opacity
