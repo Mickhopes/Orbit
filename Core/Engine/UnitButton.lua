@@ -61,6 +61,7 @@ function UnitButtonMixin:UpdateAll()
     self:UpdateName()
     self:UpdateAbsorbs()
     self:UpdateHealPrediction()
+    self:UpdateTextLayout()
 end
 
 function UnitButtonMixin:UpdateHealth()
@@ -431,6 +432,29 @@ function UnitButtonMixin:SetBorderHidden(edge, hidden)
     end
 end
 
+function UnitButtonMixin:UpdateTextLayout()
+    if not self.Name or not self.HealthText or not self.TextFrame then
+        return
+    end
+
+    local height = self:GetHeight()
+    local fontName, fontHeight, fontFlags = self.Name:GetFont()
+    fontHeight = fontHeight or 12
+
+    self.Name:ClearAllPoints()
+    self.HealthText:ClearAllPoints()
+
+    -- If frame is smaller than text (with a small buffer), justify to bottom
+    -- so text grows upwards and remains readable/uncropped at the top.
+    if height < (fontHeight + 2) then
+        self.Name:SetPoint("BOTTOMLEFT", self.TextFrame, "BOTTOMLEFT", 5, 0)
+        self.HealthText:SetPoint("BOTTOMRIGHT", self.TextFrame, "BOTTOMRIGHT", -5, 0)
+    else
+        self.Name:SetPoint("LEFT", self.TextFrame, "LEFT", 5, 0)
+        self.HealthText:SetPoint("RIGHT", self.TextFrame, "RIGHT", -5, 0)
+    end
+end
+
 function UnitButtonMixin:SetBorder(size)
     -- Delegate to Skin Engine
     if Orbit.Skin:SkinBorder(self, self, size) then
@@ -605,7 +629,7 @@ function UnitButton:Create(parent, unit, name)
 
     -- Divider removed by user request.
     -- Text Frame to ensure text sits ABOVE absorbs
-    f.TextFrame = CreateFrame("Frame", nil, f.Health)
+    f.TextFrame = CreateFrame("Frame", nil, f)
     f.TextFrame:SetAllPoints(f.Health)
     f.TextFrame:SetFrameLevel(f.Health:GetFrameLevel() + 10)
 
@@ -639,6 +663,10 @@ function UnitButton:Create(parent, unit, name)
     f:SetScript("OnLeave", function(self)
         self:SetMouseOver(false)
         GameTooltip:Hide()
+    end)
+
+    f:HookScript("OnSizeChanged", function(self)
+        self:UpdateTextLayout()
     end)
 
     -- OnUpdate for damage bar animation (simple time-delayed snap)

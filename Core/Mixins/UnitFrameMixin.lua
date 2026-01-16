@@ -28,6 +28,14 @@ function Mixin:GetPlayerSetting(key)
     return nil
 end
 
+-- Helper to get setting from self or inherit from player
+function Mixin:GetInheritedSetting(systemIndex, key, inheritFromPlayer)
+    if inheritFromPlayer then
+        return self:GetPlayerSetting(key)
+    end
+    return self:GetSetting(systemIndex, key)
+end
+
 -- [ NATIVE FRAME HIDING ]----------------------------------------------------------------------------
 function Mixin:HideNativeUnitFrame(nativeFrame, hiddenParentName)
     local hiddenParent = CreateFrame("Frame", hiddenParentName, UIParent)
@@ -89,7 +97,7 @@ function Mixin:ApplyTextStyling(frame, textSize)
     -- Calculate adaptive text size if not provided (respects global TextScale setting)
     if not textSize or textSize <= 0 then
         local height = frame:GetHeight() or 40
-        textSize = Orbit.Skin:GetAdaptiveTextSize(height, 12, 24, 0.25)
+        textSize = Orbit.Skin:GetAdaptiveTextSize(height, 14, 24, 0.3)
     end
 
     -- Apply standard unit frame text styling with calculated text size
@@ -106,7 +114,7 @@ end
 
 -- [ BACKDROP COLOR APPLICATION ]---------------------------------------------------------------------
 
-function Mixin:UpdateBackdropColor(frame, systemIndex)
+function Mixin:UpdateBackdropColor(frame, systemIndex, inheritFromPlayer)
     if not frame then
         return
     end
@@ -118,7 +126,7 @@ function Mixin:UpdateBackdropColor(frame, systemIndex)
     end
 
     -- Get color from settings (inherits global due to PluginMixin update)
-    local color = self:GetSetting(systemIndex, "BackdropColour")
+    local color = self:GetInheritedSetting(systemIndex, "BackdropColour", inheritFromPlayer)
 
     if color then
         -- Handle both table format {r,g,b,a} and potentially Hex string if that ever changes
@@ -141,32 +149,19 @@ function Mixin:ApplyBaseVisuals(frame, systemIndex, options)
     options = options or {}
 
     -- Determine settings source
-    local borderSize, textureName, healthTextEnabled
+    local borderSize = self:GetInheritedSetting(systemIndex, "BorderSize", options.inheritFromPlayer)
+    local textureName = self:GetInheritedSetting(systemIndex, "Texture", options.inheritFromPlayer)
+    local healthTextEnabled = self:GetInheritedSetting(systemIndex, "HealthTextEnabled", options.inheritFromPlayer)
 
-    if options.inheritFromPlayer then
-        -- Target/Focus/Pet inherit from PlayerFrame
-        borderSize = self:GetPlayerSetting("BorderSize")
-        textureName = self:GetPlayerSetting("Texture")
-        healthTextEnabled = self:GetPlayerSetting("HealthTextEnabled")
-        if healthTextEnabled == nil then
-            healthTextEnabled = true
-        end
-    else
-        -- PlayerFrame uses its own settings
-        borderSize = self:GetSetting(systemIndex, "BorderSize")
-        textureName = self:GetSetting(systemIndex, "Texture")
-        healthTextEnabled = self:GetSetting(systemIndex, "HealthTextEnabled")
+    if healthTextEnabled == nil then
+        healthTextEnabled = true
     end
-
-    -- Calculate adaptive text size based on frame height (respects global TextScale setting)
-    local height = frame:GetHeight() or 40
-    local textSize = Orbit.Skin:GetAdaptiveTextSize(height, 12, 24, 0.25)
 
     -- Apply texture
     self:ApplyTexture(frame, textureName)
 
     -- Apply Backrop Colour
-    self:UpdateBackdropColor(frame, systemIndex)
+    self:UpdateBackdropColor(frame, systemIndex, options.inheritFromPlayer)
 
     -- Apply border
     if frame.SetBorder then
@@ -174,7 +169,7 @@ function Mixin:ApplyBaseVisuals(frame, systemIndex, options)
     end
 
     -- Apply text styling
-    self:ApplyTextStyling(frame, textSize)
+    self:ApplyTextStyling(frame)
 
     -- Apply health text visibility
     if frame.SetHealthTextEnabled then

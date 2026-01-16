@@ -245,13 +245,13 @@ function Anchor:CreateAnchor(child, parent, edge, padding, syncOptions, align, s
                 if opts.useRowDimension and parent.orbitRowHeight then
                     height = parent.orbitRowHeight
                 end
-                child:SetHeight(height)
+                child:SetHeight(math.max(height, 5))
             else
                 local width = parentWidth
                 if opts.useRowDimension and parent.orbitColumnWidth then
                     width = parent.orbitColumnWidth
                 end
-                child:SetWidth(width)
+                child:SetWidth(math.max(width, 10))
             end
         end
     end
@@ -429,13 +429,13 @@ function Anchor:SyncChildren(parent, suppressApplySettings, visited)
                         if opts.useRowDimension and parent.orbitRowHeight then
                             height = parent.orbitRowHeight
                         end
-                        child:SetHeight(height)
+                        child:SetHeight(math.max(height, 5))
                     else
                         local width = parentWidth
                         if opts.useRowDimension and parent.orbitColumnWidth then
                             width = parent.orbitColumnWidth
                         end
-                        child:SetWidth(width)
+                        child:SetWidth(math.max(width, 10))
                     end
                 end
 
@@ -470,13 +470,13 @@ function Anchor:SyncChildren(parent, suppressApplySettings, visited)
                     if opts.useRowDimension and parent.orbitRowHeight then
                         height = parent.orbitRowHeight
                     end
-                    child:SetHeight(height)
+                    child:SetHeight(math.max(height, 5))
                 else
                     local width = parentWidth
                     if opts.useRowDimension and parent.orbitColumnWidth then
                         width = parent.orbitColumnWidth
                     end
-                    child:SetWidth(width)
+                    child:SetWidth(math.max(width, 10))
                 end
             end
 
