@@ -10,6 +10,10 @@ local CM = Orbit.CombatManager
 CM.inCombat = false
 CM.updateQueue = {}
 
+-- Prevent unbounded queue growth during extended combat (e.g., long raid encounters)
+-- 100 is conservative - typical gameplay queues far fewer updates
+local MAX_QUEUE_SIZE = 100
+
 local eventFrame = CreateFrame("Frame")
 
 eventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
@@ -36,6 +40,12 @@ function CM:QueueUpdate(callback, context)
         else
             callback()
         end
+        return
+    end
+
+    -- Prevent unbounded growth - drop new updates when full
+    -- This is safe: queued UI updates become stale anyway
+    if #self.updateQueue >= MAX_QUEUE_SIZE then
         return
     end
 

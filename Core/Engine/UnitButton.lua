@@ -87,7 +87,10 @@ function UnitButtonMixin:UpdateHealth()
     -- The DamageBar stays where it is, OnUpdate will slide it down after a delay
     if self.HealthDamageBar then
         self.lastHealthUpdate = GetTime()
-        self.damageBarAnimating = true
+        -- Enable OnUpdate handler only when animation is needed (saves CPU)
+        if self.DamageBarOnUpdate then
+            self:SetScript("OnUpdate", self.DamageBarOnUpdate)
+        end
     end
 
     -- Color logic
@@ -233,6 +236,33 @@ function UnitButtonMixin:UpdatePower() end
 -- Avoids math on secret values by letting the client handle layout
 -------------------------------------------------
 
+-- Helper: Only re-anchor if the anchor target has changed
+-- Reduces redundant ClearAllPoints/SetPoint calls during frequent updates
+local function SafeSetHealBarPoints(bar, anchorTexture, width)
+    -- Check if anchor has changed (cached on the bar)
+    if bar.cachedAnchor ~= anchorTexture or bar.cachedWidth ~= width then
+        bar:ClearAllPoints()
+        bar:SetWidth(width)
+        bar:SetPoint("TOPLEFT", anchorTexture, "TOPRIGHT", 0, 0)
+        bar:SetPoint("BOTTOMLEFT", anchorTexture, "BOTTOMRIGHT", 0, 0)
+        bar.cachedAnchor = anchorTexture
+        bar.cachedWidth = width
+    end
+end
+
+-- Variant for heal absorb bar (right-anchored, reverse fill)
+local function SafeSetHealAbsorbPoints(bar, healthBar, width)
+    local texture = healthBar:GetStatusBarTexture()
+    if bar.cachedAnchor ~= texture or bar.cachedWidth ~= width then
+        bar:ClearAllPoints()
+        bar:SetWidth(width)
+        bar:SetPoint("TOPRIGHT", texture, "TOPRIGHT", 0, 0)
+        bar:SetPoint("BOTTOMRIGHT", texture, "BOTTOMRIGHT", 0, 0)
+        bar.cachedAnchor = texture
+        bar.cachedWidth = width
+    end
+end
+
 function UnitButtonMixin:UpdateHealPrediction()
     local maxHealth = UnitHealthMax(self.unit)
     -- We assume maxHealth is never secret, as it's a cap, not current state.
@@ -257,10 +287,7 @@ function UnitButtonMixin:UpdateHealPrediction()
 
         -- Always Show (width 0 if value is 0)
         self.MyIncomingHealBar:Show()
-        self.MyIncomingHealBar:ClearAllPoints()
-        self.MyIncomingHealBar:SetWidth(totalWidth) -- Set explicit width
-        self.MyIncomingHealBar:SetPoint("TOPLEFT", healthTexture, "TOPRIGHT", 0, 0)
-        self.MyIncomingHealBar:SetPoint("BOTTOMLEFT", healthTexture, "BOTTOMRIGHT", 0, 0)
+        SafeSetHealBarPoints(self.MyIncomingHealBar, healthTexture, totalWidth)
     end
 
     -----------------------------------------------------------------------
@@ -278,11 +305,7 @@ function UnitButtonMixin:UpdateHealPrediction()
         self.OtherIncomingHealBar:SetValue(allIncomingHeal)
 
         self.OtherIncomingHealBar:Show()
-        self.OtherIncomingHealBar:ClearAllPoints()
-        self.OtherIncomingHealBar:SetWidth(totalWidth) -- Set explicit width
-        -- Anchor to Health, just like MyIncomingHealBar
-        self.OtherIncomingHealBar:SetPoint("TOPLEFT", healthTexture, "TOPRIGHT", 0, 0)
-        self.OtherIncomingHealBar:SetPoint("BOTTOMLEFT", healthTexture, "BOTTOMRIGHT", 0, 0)
+        SafeSetHealBarPoints(self.OtherIncomingHealBar, healthTexture, totalWidth)
     end
 
     -----------------------------------------------------------------------
@@ -306,16 +329,11 @@ function UnitButtonMixin:UpdateHealPrediction()
             self.TotalAbsorbBar:SetValue(totalAbsorb)
 
             self.TotalAbsorbBar:Show()
-            self.TotalAbsorbBar:ClearAllPoints()
-            self.TotalAbsorbBar:SetWidth(totalWidth) -- Set explicit width
-            self.TotalAbsorbBar:SetPoint("TOPLEFT", absorbAnchorTexture, "TOPRIGHT", 0, 0)
-            self.TotalAbsorbBar:SetPoint("BOTTOMLEFT", absorbAnchorTexture, "BOTTOMRIGHT", 0, 0)
+            SafeSetHealBarPoints(self.TotalAbsorbBar, absorbAnchorTexture, totalWidth)
 
-            -- Update Overlay Visibility
+            -- Update Overlay Visibility (overlay always matches bar texture)
             if self.TotalAbsorbOverlay then
                 self.TotalAbsorbOverlay:Show()
-                -- Ensure Overlay anchors to the FILL, not the frame
-                self.TotalAbsorbOverlay:ClearAllPoints()
                 self.TotalAbsorbOverlay:SetAllPoints(self.TotalAbsorbBar:GetStatusBarTexture())
             end
         end
@@ -334,19 +352,9 @@ function UnitButtonMixin:UpdateHealPrediction()
             self.HealAbsorbBar:SetMinMaxValues(0, maxHealth)
             self.HealAbsorbBar:SetValue(healAbsorbAmount)
 
-            -- Always Show.
-            -- Using Frame-based shadows (clipped by Mask when width is 0) handles the 0-value case.
+            -- Always Show (clipped by Mask when width is 0)
             self.HealAbsorbBar:Show()
-
-            local healthBar = self.Health
-            local totalWidth = healthBar:GetWidth()
-
-            -- Ideally we'd just Anchor TOPRIGHT/BOTTOMRIGHT to the texture,
-            -- and set Width to match.
-            self.HealAbsorbBar:ClearAllPoints()
-            self.HealAbsorbBar:SetWidth(totalWidth)
-            self.HealAbsorbBar:SetPoint("TOPRIGHT", healthBar:GetStatusBarTexture(), "TOPRIGHT", 0, 0)
-            self.HealAbsorbBar:SetPoint("BOTTOMRIGHT", healthBar:GetStatusBarTexture(), "BOTTOMRIGHT", 0, 0)
+            SafeSetHealAbsorbPoints(self.HealAbsorbBar, self.Health, self.Health:GetWidth())
         end
     end
 end
@@ -671,17 +679,20 @@ function UnitButton:Create(parent, unit, name)
 
     -- OnUpdate for damage bar animation (simple time-delayed snap)
     -- Shows the red chunk for DELAY seconds, then snaps to current health
-    f:SetScript("OnUpdate", function(self, elapsed)
-        if not self.damageBarAnimating or not self.HealthDamageBar then
+    -- NOTE: This script is only SET when animation starts (in UpdateHealth)
+    --       and CLEARED when animation completes (saves CPU when not animating)
+    local DAMAGE_BAR_DELAY = 0.3 -- Show red chunk for this long before snapping
+    
+    local function DamageBarOnUpdate(self, elapsed)
+        if not self.HealthDamageBar then
+            self:SetScript("OnUpdate", nil)
             return
         end
-
-        local DELAY = 0.3 -- Show red chunk for this long before snapping
 
         local now = GetTime()
         local timeSinceChange = now - (self.lastHealthUpdate or 0)
 
-        if timeSinceChange < DELAY then
+        if timeSinceChange < DAMAGE_BAR_DELAY then
             -- Still in delay period, red chunk is visible
             return
         end
@@ -689,8 +700,13 @@ function UnitButton:Create(parent, unit, name)
         -- After delay, sync DamageBar to Health bar's current value
         local healthValue = self.Health:GetValue()
         self.HealthDamageBar:SetValue(healthValue, SMOOTH_ANIM)
-        self.damageBarAnimating = false
-    end)
+        
+        -- Animation complete - remove OnUpdate handler to save CPU
+        self:SetScript("OnUpdate", nil)
+    end
+    
+    -- Store the function on the frame for use in UpdateHealth
+    f.DamageBarOnUpdate = DamageBarOnUpdate
 
     RegisterUnitWatch(f)
 

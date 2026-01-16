@@ -48,6 +48,7 @@ function ErrorHandler:Wrap(func, context)
 end
 
 --- Log an error to SavedVariables for later debugging
+-- Uses circular buffer for O(1) insertion (avoids O(n) table.remove)
 -- @param source (string): Where the error occurred
 -- @param method (string): Method or context
 -- @param error (string): Error message
@@ -58,21 +59,21 @@ function ErrorHandler:LogError(source, method, err)
 
     if not Orbit.db.ErrorLog then
         Orbit.db.ErrorLog = {}
+        Orbit.db.ErrorLogIndex = 0  -- Circular buffer pointer
     end
 
-    -- Limit error log size to prevent SavedVariables bloat
+    -- Circular buffer: O(1) insertion by overwriting oldest entry
     local MAX_ERRORS = 50
-    while #Orbit.db.ErrorLog >= MAX_ERRORS do
-        table.remove(Orbit.db.ErrorLog, 1)
-    end
+    local index = (Orbit.db.ErrorLogIndex % MAX_ERRORS) + 1
+    Orbit.db.ErrorLogIndex = index
 
-    table.insert(Orbit.db.ErrorLog, {
+    Orbit.db.ErrorLog[index] = {
         time = time(),
         date = date("%Y-%m-%d %H:%M:%S"),
         source = tostring(source),
         method = tostring(method),
         error = tostring(err),
-    })
+    }
 end
 
 -- [ VISIBILITY MANAGER ]----------------------------------------------------------------------------

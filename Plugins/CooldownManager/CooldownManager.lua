@@ -226,7 +226,9 @@ function Plugin:HookBlizzardViewers()
     end
 
     -- Re-apply parentage when Edit Mode layout changes (e.g. exit)
-    if EventRegistry then
+    -- Guard against duplicate registration
+    if EventRegistry and not self.editModeExitRegistered then
+        self.editModeExitRegistered = true
         EventRegistry:RegisterCallback("EditMode.Exit", function()
             self:ReapplyParentage()
         end, self)

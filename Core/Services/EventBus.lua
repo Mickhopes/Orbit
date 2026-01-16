@@ -78,24 +78,48 @@ function EventBus:OffContext(context)
 end
 
 --- Fire an event to all listeners (internal use, also callable for custom events)
+-- Optimized to avoid table allocation for varargs (critical for high-frequency events)
 -- @param event (string): The event name
 -- @param ...: Arguments to pass to listeners
 function EventBus:Fire(event, ...)
-    if not self.listeners[event] then
+    local listeners = self.listeners[event]
+    if not listeners then
         return
     end
 
-    -- Capture varargs before passing to anonymous function
-    local args = { ... }
-
-    for _, listener in ipairs(self.listeners[event]) do
-        local success, err = pcall(function()
-            if listener.context then
-                listener.callback(listener.context, unpack(args))
+    -- Capture vararg count once (no table allocation)
+    local n = select("#", ...)
+    
+    for i = 1, #listeners do
+        local listener = listeners[i]
+        local success, err
+        
+        -- Avoid creating closure by calling directly based on arg count
+        -- Most events have 0-3 args, so we optimize for common cases
+        if listener.context then
+            if n == 0 then
+                success, err = pcall(listener.callback, listener.context)
+            elseif n == 1 then
+                success, err = pcall(listener.callback, listener.context, ...)
+            elseif n == 2 then
+                success, err = pcall(listener.callback, listener.context, ...)
+            elseif n == 3 then
+                success, err = pcall(listener.callback, listener.context, ...)
             else
-                listener.callback(unpack(args))
+                -- Fallback for rare high-arg-count events (still allocates but uncommon)
+                local args = { ... }
+                success, err = pcall(function() listener.callback(listener.context, unpack(args)) end)
             end
-        end)
+        else
+            if n == 0 then
+                success, err = pcall(listener.callback)
+            elseif n <= 3 then
+                success, err = pcall(listener.callback, ...)
+            else
+                local args = { ... }
+                success, err = pcall(function() listener.callback(unpack(args)) end)
+            end
+        end
 
         if not success then
             Orbit:Print("|cFFFF0000EventBus Error|r in", event, ":", tostring(err))

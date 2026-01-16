@@ -802,8 +802,10 @@ function Plugin:OnLoad()
 
     self:RegisterStandardEvents()
 
-    -- Edit Mode callbacks
-    if EventRegistry then
+    -- Edit Mode callbacks (guard against duplicate registration)
+    if EventRegistry and not self.editModeCallbacksRegistered then
+        self.editModeCallbacksRegistered = true
+        
         EventRegistry:RegisterCallback("EditMode.Enter", function()
             self:ShowPreview()
             self:ApplySettings()

@@ -9,6 +9,39 @@ local Async = Orbit.Async
 local timers = {}
 local lastRun = {}
 
+-- Cleanup configuration
+local CLEANUP_INTERVAL = 60    -- Run cleanup every 60 seconds
+local STALE_THRESHOLD = 60     -- Remove entries older than 60 seconds
+local MIN_ENTRIES_FOR_CLEANUP = 10  -- Only cleanup if table has this many entries
+
+-- Periodic cleanup to prevent unbounded lastRun growth
+local function CleanupStaleEntries()
+    local count = 0
+    for _ in pairs(lastRun) do
+        count = count + 1
+        if count >= MIN_ENTRIES_FOR_CLEANUP then break end
+    end
+    
+    -- Only run full cleanup if we have enough entries
+    if count >= MIN_ENTRIES_FOR_CLEANUP then
+        local now = GetTime()
+        local threshold = now - STALE_THRESHOLD
+        for key, timestamp in pairs(lastRun) do
+            if timestamp < threshold then
+                lastRun[key] = nil
+            end
+        end
+    end
+end
+
+-- Start cleanup ticker (runs once table is first used)
+local cleanupTicker
+local function EnsureCleanupRunning()
+    if not cleanupTicker then
+        cleanupTicker = C_Timer.NewTicker(CLEANUP_INTERVAL, CleanupStaleEntries)
+    end
+end
+
 --- Debounce: Delays execution until 'delay' seconds have passed since the last call.
 -- Useful for events that fire rapidly (like bag updates) where you only want the final result.
 -- @param key (string): Unique identifier for this task
@@ -39,6 +72,9 @@ end
 function Async:Throttle(key, func, interval)
     interval = interval or 0.1
     local now = GetTime()
+
+    -- Ensure cleanup is running (lazy start)
+    EnsureCleanupRunning()
 
     if not lastRun[key] or (now - lastRun[key] > interval) then
         lastRun[key] = now
@@ -72,4 +108,11 @@ function Async:ClearAll()
     end
     timers = {}
     lastRun = {}
+    
+    -- Stop cleanup ticker if running
+    if cleanupTicker then
+        cleanupTicker:Cancel()
+        cleanupTicker = nil
+    end
 end
+

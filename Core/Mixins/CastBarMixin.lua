@@ -126,6 +126,12 @@ function Mixin:RegisterEditModeCallbacks(bar, debounceKey)
         return
     end
 
+    -- Guard: Prevent duplicate registration if called multiple times
+    if bar.orbitEditModeCallbacksRegistered then
+        return
+    end
+    bar.orbitEditModeCallbacksRegistered = true
+
     EventRegistry:RegisterCallback("EditMode.Exit", function()
         bar.preview = false
         if not bar.casting and not bar.channeling then
