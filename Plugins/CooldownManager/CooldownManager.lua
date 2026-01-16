@@ -47,6 +47,21 @@ function Plugin:AddSettings(dialog, systemFrame)
     local schema = {
         hideNativeSettings = true,
         controls = {},
+        extraButtons = {
+            {
+                text = "Cooldown Settings",
+                callback = function()
+                    -- Exit Edit Mode first
+                    if EditModeManagerFrame and EditModeManagerFrame:IsShown() then
+                        HideUIPanel(EditModeManagerFrame)
+                    end
+                    -- Open Blizzard Cooldown Settings
+                    if CooldownViewerSettings then
+                        CooldownViewerSettings:Show()
+                    end
+                end,
+            },
+        },
     }
 
     -- 1. Orientation (hide when anchored - orientation becomes fixed by anchor)
