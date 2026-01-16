@@ -3,6 +3,10 @@ local Orbit = addonTable
 local OrbitEngine = Orbit.Engine
 local LSM = LibStub("LibSharedMedia-3.0")
 
+-- Reference to shared helpers (loaded from BossFrameHelpers.lua)
+-- Note: BossFrameHelpers.lua must be loaded before this file in the TOC
+local Helpers = nil -- Will be set when first needed
+
 -- [ CONSTANTS ]-------------------------------------------------------------------------------------
 local MAX_BOSS_FRAMES = 5
 local POWER_BAR_HEIGHT_RATIO = 0.2 -- 20% of frame height
@@ -167,26 +171,17 @@ local function UpdateDebuffs(frame, plugin)
     local frameHeight = frame:GetHeight()
     local frameWidth = frame:GetWidth()
     local maxDebuffs = plugin:GetSetting(1, "MaxDebuffs") or 4
-    local spacing = 2
 
-    -- Calculate Size & Layout
-    local iconSize, xOffsetStep, yOffsetStep
-    if isHorizontal then
-        -- Dynamic sizing: Fit columns within Frame Width
-        -- Width = (N * Size) + ((N-1) * Spacing)
-        -- Size = (Width - ((N-1) * Spacing)) / N
-        local totalSpacing = (maxDebuffs - 1) * spacing
-        iconSize = (frameWidth - totalSpacing) / maxDebuffs
-
-        -- Clamp max size to reasonable limit if needed, but for now trusting dynamic
-        xOffsetStep = iconSize + spacing
-        yOffsetStep = 0
-    else
-        -- Side positioning: Match Frame Height (legacy behavior)
-        iconSize = frameHeight
-        xOffsetStep = 0
-        yOffsetStep = 0 -- Not used for side growth logic below
+    -- Lazy-load helpers reference
+    if not Helpers then
+        Helpers = Orbit.BossFrameHelpers
     end
+    local spacing = Helpers.LAYOUT.Spacing
+
+    -- Calculate Size & Layout using shared helper
+    local iconSize, xOffsetStep = Helpers:CalculateDebuffLayout(
+        isHorizontal, frameWidth, frameHeight, maxDebuffs, spacing
+    )
 
     -- Initialize pool if needed
     if not frame.debuffPool then
@@ -204,37 +199,14 @@ local function UpdateDebuffs(frame, plugin)
         return
     end
 
-    -- Position container based on setting & collisions
-    frame.debuffContainer:ClearAllPoints()
-
+    -- Position container using shared helper
     local castBarPos = plugin:GetSetting(1, "CastBarPosition")
     local castBarHeight = plugin:GetSetting(1, "CastBarHeight") or 14
-    local castBarGap = 4 -- Gap between frame and castbar
-    local elementGap = 4 -- Gap between elements
 
-    if position == "Left" then
-        frame.debuffContainer:SetPoint("RIGHT", frame, "LEFT", -4, 0)
-        frame.debuffContainer:SetSize((#debuffs * iconSize) + ((#debuffs - 1) * spacing), iconSize)
-    elseif position == "Right" then
-        frame.debuffContainer:SetPoint("LEFT", frame, "RIGHT", 4, 0)
-        frame.debuffContainer:SetSize((#debuffs * iconSize) + ((#debuffs - 1) * spacing), iconSize)
-    elseif position == "Above" then
-        -- Check collision with CastBar
-        local yOffset = elementGap
-        if castBarPos == "Above" then
-            yOffset = yOffset + castBarHeight + castBarGap
-        end
-        frame.debuffContainer:SetPoint("BOTTOMLEFT", frame, "TOPLEFT", 0, yOffset)
-        frame.debuffContainer:SetSize(frameWidth, iconSize)
-    elseif position == "Below" then
-        -- Check collision with CastBar
-        local yOffset = -elementGap
-        if castBarPos == "Below" then
-            yOffset = yOffset - castBarHeight - castBarGap
-        end
-        frame.debuffContainer:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", 0, yOffset)
-        frame.debuffContainer:SetSize(frameWidth, iconSize)
-    end
+    Helpers:PositionDebuffContainer(
+        frame.debuffContainer, frame, position,
+        #debuffs, iconSize, spacing, castBarPos, castBarHeight
+    )
 
     -- Prepare Skin Settings
     local globalBorder = plugin:GetPlayerSetting("BorderSize")
@@ -249,21 +221,13 @@ local function UpdateDebuffs(frame, plugin)
     local currentX = 0
     for i, aura in ipairs(debuffs) do
         local icon = frame.debuffPool:Acquire()
-        icon:ClearAllPoints()
+        icon:SetSize(iconSize, iconSize)
 
-        if isHorizontal then
-            -- Grow Right
-            icon:SetPoint("TOPLEFT", frame.debuffContainer, "TOPLEFT", currentX, 0)
-            currentX = currentX + xOffsetStep
-        elseif position == "Left" then
-            -- Grow Left: First icon at Right edge
-            icon:SetPoint("TOPRIGHT", frame.debuffContainer, "TOPRIGHT", -currentX, 0)
-            currentX = currentX + iconSize + spacing
-        else -- Right
-            -- Grow Right: First icon at Left edge
-            icon:SetPoint("TOPLEFT", frame.debuffContainer, "TOPLEFT", currentX, 0)
-            currentX = currentX + iconSize + spacing
-        end
+        -- Position icon using shared helper
+        currentX = Helpers:PositionDebuffIcon(
+            icon, frame.debuffContainer, isHorizontal, position,
+            currentX, iconSize, xOffsetStep, spacing
+        )
 
         -- Use Mixin for setup (Icon, Cooldown, Count, Skin)
         plugin:SetupAuraIcon(icon, aura, iconSize, unit, skinSettings)
