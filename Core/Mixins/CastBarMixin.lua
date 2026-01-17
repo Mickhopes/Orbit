@@ -75,9 +75,7 @@ end
 function Mixin:CreateCastBarFrame(name, config)
     config = config or {}
 
-    -- Use nil for frame name to prevent the frame from becoming protected
-    -- Named frames can become protected when manipulated from tainted hook contexts
-    local bar = CreateFrame("StatusBar", nil, UIParent)
+    local bar = CreateFrame("StatusBar", name, UIParent)
     bar:SetSize(
         config.width or Orbit.Constants.PlayerCastBar.DefaultWidth or 200,
         config.height or Orbit.Constants.PlayerCastBar.DefaultHeight or 18
