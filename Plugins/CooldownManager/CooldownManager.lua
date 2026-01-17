@@ -25,6 +25,7 @@ local Plugin = Orbit:RegisterPlugin("Cooldown Manager", "Orbit_CooldownViewer", 
         Orientation = 0,
         IconLimit = Constants.Cooldown.DefaultLimit,
         ShowTimer = true,
+        HideGCDSwipe = true,
         -- Glow Settings (use PandemicGlow constants for consistency)
         PandemicGlowType = Constants.PandemicGlow.DefaultType,
         PandemicGlowColor = Constants.PandemicGlow.DefaultColor,
@@ -133,6 +134,14 @@ function Plugin:AddSettings(dialog, systemFrame)
         type = "checkbox",
         key = "ShowTimer",
         label = "Show Timer",
+        default = true,
+    })
+
+    -- 9. Hide GCD Swipe
+    table.insert(schema.controls, {
+        type = "checkbox",
+        key = "HideGCDSwipe",
+        label = "Hide GCD Swipe",
         default = true,
     })
 
@@ -798,6 +807,8 @@ function Plugin:ProcessChildren(anchor)
             padding = self:GetSetting(systemIndex, "IconPadding"),
             size = self:GetSetting(systemIndex, "IconSize"),
             showTimer = self:GetSetting(systemIndex, "ShowTimer"),
+            hideGCDSwipe = self:GetSetting(systemIndex, "HideGCDSwipe"),
+            baseIconSize = Constants.Skin.DefaultIconSize, -- 40x40 consistent base for all viewers
             backdropColor = self:GetSetting(systemIndex, "BackdropColour"),
             showTooltip = false,
             verticalGrowth = self:GetGrowthDirection(anchor),
@@ -813,10 +824,22 @@ function Plugin:ProcessChildren(anchor)
             Orbit.Skin.Icons:ApplyCustom(icon, skinSettings)
 
             -- [ GCD SWIPE REMOVAL ]
-            -- Hook the refresh function to forcibly hide the swipe if it's just a GCD
+            -- Hook the refresh function to dynamically hide/show the swipe based on setting
             -- Blizzard's internal logic forces the swipe for GCDs, so we must correct it after the fact.
             if not icon.orbitGCDHooked and icon.RefreshSpellCooldownInfo then
+                -- Store reference for dynamic lookup
+                icon.orbitSystemIndex = systemIndex
+                icon.orbitPlugin = self
+                
                 hooksecurefunc(icon, "RefreshSpellCooldownInfo", function(self)
+                    -- Dynamically check current setting
+                    local plugin = self.orbitPlugin
+                    local sysIdx = self.orbitSystemIndex
+                    if not plugin or not sysIdx then return end
+                    
+                    local hideGCD = plugin:GetSetting(sysIdx, "HideGCDSwipe")
+                    if hideGCD == false then return end  -- Setting is OFF, don't hide
+                    
                     -- Fix: Do not hide if the swipe is actually coming from an Aura (e.g. debuff on target)
                     if self.isOnGCD and not self.wasSetFromAura then
                         local cooldown = self:GetCooldownFrame()
