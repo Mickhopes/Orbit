@@ -20,8 +20,6 @@ local Plugin = Orbit:RegisterPlugin("Target Frame", SYSTEM_ID, {
     },
 }, Orbit.Constants.PluginGroups.UnitFrames)
 
--- [ HELPERS ]---------------------------------------------------------------------------------------
-
 -- [ SETTINGS UI ]-----------------------------------------------------------------------------------
 function Plugin:AddSettings(dialog, systemFrame)
     local systemIndex = systemFrame.systemIndex
