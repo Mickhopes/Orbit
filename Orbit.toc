@@ -55,8 +55,10 @@ Core\Engine\Frame\Guard.lua
 Core\Engine\Frame\Position\PositionUtils.lua
 Core\Engine\Frame\Position\Anchor.lua
 Core\Engine\Frame\Position\Persistence.lua
-Core\Engine\Frame\ComponentEdit.lua
-Core\Engine\Frame\ComponentDrag.lua
+Core\Engine\Frame\Component\ComponentHelpers.lua
+Core\Engine\Frame\Component\ComponentHandle.lua
+Core\Engine\Frame\Component\ComponentEdit.lua
+Core\Engine\Frame\Component\ComponentDrag.lua
 Core\Engine\Frame\Snap.lua
 Core\Engine\Frame\NudgeRepeat.lua
 Core\Engine\Frame\Selection\Tooltip.lua
