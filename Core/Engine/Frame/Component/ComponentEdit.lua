@@ -45,7 +45,15 @@ end
 local flashPool = nil  -- Single reusable flash frame
 
 local function PlayDeniedFeedback(frame)
-    local selection = frame.Selection
+    -- Try Orbit's selection registry first, then fall back to frame.Selection (for native frames)
+    -- This order prevents issues where frame.Selection might be a Texture instead of the Selection frame
+    local selection
+    if Engine.FrameSelection then
+        selection = Engine.FrameSelection.selections[frame]
+    end
+    if not selection then
+        selection = frame.Selection
+    end
     if not selection then return end
     
     -- Guard: don't start new flash if one is already running
@@ -53,8 +61,11 @@ local function PlayDeniedFeedback(frame)
         return
     end
     
+    -- Track if selection was already visible before we started
+    local wasShown = selection:IsShown()
+    
     -- Ensure selection is visible for the flash
-    if not selection:IsShown() then
+    if not wasShown then
         selection:Show()
     end
     
@@ -63,10 +74,30 @@ local function PlayDeniedFeedback(frame)
         flashPool = CreateFrame("Frame")
     end
     
+    -- Helper to tint all textures in the selection (like TintSelection in Selection.lua)
+    -- Handles both Frame selections (with child textures) and direct Texture selections
+    local function TintSelectionTextures(sel, r, g, b, a)
+        -- If selection is a Frame with GetRegions, iterate over child textures
+        if sel.GetRegions then
+            for i = 1, select("#", sel:GetRegions()) do
+                local region = select(i, sel:GetRegions())
+                if region:IsObjectType("Texture") and not region.isAnchorLine then
+                    region:SetVertexColor(r, g, b, a)
+                end
+            end
+        -- If selection is a Texture directly, tint it
+        elseif sel.SetVertexColor then
+            sel:SetVertexColor(r, g, b, a)
+        end
+    end
+    
     -- Flash red twice (no shake)
     local flashCount = 0
     flashPool.elapsed = 0
     flashPool.targetFrame = frame
+    flashPool.targetSelection = selection
+    flashPool.wasShown = wasShown
+    flashPool.tintFunc = TintSelectionTextures
     
     flashPool:SetScript("OnUpdate", function(self, elapsed)
         self.elapsed = (self.elapsed or 0) + elapsed
@@ -75,10 +106,12 @@ local function PlayDeniedFeedback(frame)
             self.elapsed = 0
             flashCount = flashCount + 1
             
+            local sel = self.targetSelection
+            local tint = self.tintFunc
             if flashCount % 2 == 1 then
-                selection:SetVertexColor(1, 0.2, 0.2, 0.8)  -- Red
+                tint(sel, 1, 0.2, 0.2, 0.8)  -- Red
             else
-                selection:SetVertexColor(1, 1, 1, 1)  -- Neutral
+                tint(sel, 1, 1, 1, 1)  -- Neutral
             end
             
             if flashCount >= 4 then  -- 2 complete flashes
@@ -86,10 +119,26 @@ local function PlayDeniedFeedback(frame)
                 if Engine.FrameSelection and Engine.FrameSelection.UpdateVisuals then
                     Engine.FrameSelection:UpdateVisuals(self.targetFrame)
                 else
-                    selection:SetVertexColor(1, 1, 1, 1)
+                    tint(sel, 1, 1, 1, 1)
                 end
+                
+                -- If Edit Mode is not active, ensure selection is hidden
+                if not (EditModeManagerFrame and EditModeManagerFrame:IsShown()) then
+                    if sel.Hide then sel:Hide() end
+                -- If Edit Mode is still open but selection wasn't shown before, hide it
+                elseif not self.wasShown then
+                    if sel.Hide then sel:Hide() end
+                    -- Also call UpdateVisuals to restore proper state
+                    if Engine.FrameSelection and Engine.FrameSelection.UpdateVisuals then
+                        Engine.FrameSelection:UpdateVisuals(self.targetFrame)
+                    end
+                end
+                
                 self:SetScript("OnUpdate", nil)
                 self.targetFrame = nil
+                self.targetSelection = nil
+                self.wasShown = nil
+                self.tintFunc = nil
             end
         end
     end)
