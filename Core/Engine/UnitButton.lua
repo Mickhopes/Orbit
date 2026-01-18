@@ -580,9 +580,7 @@ end
 -- Apply component positions from saved percentages
 -- Called on resize to recalculate pixel positions
 function UnitButtonMixin:ApplyComponentPositions()
-    print("[ApplyComponentPositions] Called")
     if not self.orbitPlugin or not self.orbitPlugin.GetSetting then
-        print("[ApplyComponentPositions] No orbitPlugin")
         return
     end
     
@@ -603,16 +601,13 @@ function UnitButtonMixin:ApplyComponentPositions()
     end
     
     if not positions or not next(positions) then
-        print("[ApplyComponentPositions] No positions saved")
         return
     end
     
-    print("[ApplyComponentPositions] Found positions, Name.anchorX=" .. tostring(positions.Name and positions.Name.anchorX))
+
     
-    -- Get current frame dimensions
     local width, height = self:GetWidth(), self:GetHeight()
     if width <= 0 or height <= 0 then
-        print("[ApplyComponentPositions] Invalid dimensions")
         return
     end
     
@@ -876,7 +871,7 @@ function UnitButton:Create(parent, unit, name)
         Engine.ComponentDrag:Attach(f.Name, f, {
             key = "Name",
             onPositionChange = function(component, anchorX, anchorY, offsetX, offsetY, justifyH)
-                print("[Name onPositionChange] anchorX=" .. tostring(anchorX))
+
                 -- Save edge-relative position to plugin settings
                 if f.orbitPlugin and f.orbitPlugin.SetSetting then
                     local systemIndex = f.systemIndex or 1
@@ -889,7 +884,7 @@ function UnitButton:Create(parent, unit, name)
         Engine.ComponentDrag:Attach(f.HealthText, f, {
             key = "HealthText",
             onPositionChange = function(component, anchorX, anchorY, offsetX, offsetY, justifyH)
-                print("[HealthText onPositionChange] anchorX=" .. tostring(anchorX))
+
                 if f.orbitPlugin and f.orbitPlugin.SetSetting then
                     local systemIndex = f.systemIndex or 1
                     local positions = f.orbitPlugin:GetSetting(systemIndex, "ComponentPositions") or {}

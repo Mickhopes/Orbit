@@ -163,20 +163,28 @@ function Tooltip:ShowComponentPosition(component, key, anchorX, anchorY, posX, p
     end
     
     -- Format display values
-    local displayPosX = math.floor((posX or 0) + 0.5)
-    local displayPosY = math.floor((posY or 0) + 0.5)
     local displayOffX = math.floor((offsetX or 0) + 0.5)
     local displayOffY = math.floor((offsetY or 0) + 0.5)
+    local displayPosX = math.floor((posX or 0) + 0.5)
+    local displayPosY = math.floor((posY or 0) + 0.5)
     local justifyStr = justifyH or "CENTER"
-
-    -- Four-line format: Anchor, JustifyH, Center coords, Edge coords
-    self.positionTooltip.text:SetText(string.format(
-        "%s\nJustify: %s\nCenter: %d, %d\nEdge: %d, %d",
-        anchorStr,
-        justifyStr,
-        displayPosX, displayPosY,
-        displayOffX, displayOffY
-    ))
+    
+    -- Build tooltip text based on anchor type
+    local tooltipText
+    local isCenteredX = (anchorX == "CENTER")
+    local isCenteredY = (anchorY == "CENTER")
+    
+    if isCenteredX and isCenteredY then
+        -- Fully centered - show center position only
+        tooltipText = string.format("%s\nJustify: %s\nPosition: %d, %d",
+            anchorStr, justifyStr, displayPosX, displayPosY)
+    else
+        -- Edge-anchored - show edge offsets
+        tooltipText = string.format("%s\nJustify: %s\nOffset: %d, %d",
+            anchorStr, justifyStr, displayOffX, displayOffY)
+    end
+    
+    self.positionTooltip.text:SetText(tooltipText)
 
     -- Resize tooltip to fit text
     local textWidth = self.positionTooltip.text:GetStringWidth()

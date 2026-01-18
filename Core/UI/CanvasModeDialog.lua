@@ -13,9 +13,9 @@ local LSM = LibStub("LibSharedMedia-3.0")
 -------------------------------------------------
 local DIALOG_WIDTH = 450
 local DIALOG_MIN_HEIGHT = 200
-local DEFAULT_PREVIEW_SCALE = 1.0  -- Default preview scale
-local MIN_PREVIEW_SCALE = 0.5
-local MAX_PREVIEW_SCALE = 1.5
+local DEFAULT_PREVIEW_SCALE = 1.5  -- Default preview scale
+local MIN_PREVIEW_SCALE = 1
+local MAX_PREVIEW_SCALE = 2
 local SCALE_STEP = 0.1
 local PREVIEW_SCALE = DEFAULT_PREVIEW_SCALE  -- Current preview scale (updated by scroll)
 local PREVIEW_PADDING = 30
@@ -299,37 +299,42 @@ function Dialog:NudgeComponent(container, direction)
     -- Adjust offset based on direction
     -- For LEFT/RIGHT anchor, offsetX is distance from that edge (positive = inside)
     -- For TOP/BOTTOM anchor, offsetY is distance from that edge (positive = inside)
+    -- For CENTER anchor, offset = pos (distance from center)
     if direction == "LEFT" then
         if anchorX == "LEFT" then
-            offsetX = offsetX - NUDGE  -- Move toward left edge
+            offsetX = offsetX - NUDGE
         elseif anchorX == "RIGHT" then
-            offsetX = offsetX + NUDGE  -- Move away from right edge
+            offsetX = offsetX + NUDGE
         else
             container.posX = (container.posX or 0) - NUDGE
+            offsetX = container.posX  -- Sync for Apply
         end
     elseif direction == "RIGHT" then
         if anchorX == "LEFT" then
-            offsetX = offsetX + NUDGE  -- Move away from left edge
+            offsetX = offsetX + NUDGE
         elseif anchorX == "RIGHT" then
-            offsetX = offsetX - NUDGE  -- Move toward right edge
+            offsetX = offsetX - NUDGE
         else
             container.posX = (container.posX or 0) + NUDGE
+            offsetX = container.posX  -- Sync for Apply
         end
     elseif direction == "UP" then
         if anchorY == "TOP" then
-            offsetY = offsetY - NUDGE  -- Move toward top edge
+            offsetY = offsetY - NUDGE
         elseif anchorY == "BOTTOM" then
-            offsetY = offsetY + NUDGE  -- Move away from bottom edge
+            offsetY = offsetY + NUDGE
         else
             container.posY = (container.posY or 0) + NUDGE
+            offsetY = container.posY  -- Sync for Apply
         end
     elseif direction == "DOWN" then
         if anchorY == "TOP" then
-            offsetY = offsetY + NUDGE  -- Move away from top edge
+            offsetY = offsetY + NUDGE
         elseif anchorY == "BOTTOM" then
-            offsetY = offsetY - NUDGE  -- Move toward bottom edge
+            offsetY = offsetY - NUDGE
         else
             container.posY = (container.posY or 0) - NUDGE
+            offsetY = container.posY  -- Sync for Apply
         end
     end
     
@@ -339,10 +344,25 @@ function Dialog:NudgeComponent(container, direction)
     
     -- Reposition the container
     local anchorPoint = BuildAnchorPoint(anchorX, anchorY)
-    local finalX = offsetX * PREVIEW_SCALE
-    local finalY = offsetY * PREVIEW_SCALE
-    if anchorX == "RIGHT" then finalX = -finalX end
-    if anchorY == "TOP" then finalY = -finalY end
+    
+    -- For CENTER anchor, use posX/posY for positioning
+    local posX = container.posX or 0
+    local posY = container.posY or 0
+    
+    local finalX, finalY
+    if anchorX == "CENTER" then
+        finalX = posX * PREVIEW_SCALE
+    else
+        finalX = offsetX * PREVIEW_SCALE
+        if anchorX == "RIGHT" then finalX = -finalX end
+    end
+    
+    if anchorY == "CENTER" then
+        finalY = posY * PREVIEW_SCALE
+    else
+        finalY = offsetY * PREVIEW_SCALE
+        if anchorY == "TOP" then finalY = -finalY end
+    end
     
     container:ClearAllPoints()
     if container.isFontString and justifyH ~= "CENTER" then
@@ -557,11 +577,8 @@ local function CreateDraggableComponent(preview, key, sourceComponent, startX, s
         offsetX = data.offsetX
         offsetY = data.offsetY
         justifyH = data.justifyH
-        print("[CreateDraggable] " .. key .. " USING SAVED: anchorX=" .. tostring(anchorX) .. " offsetX=" .. tostring(offsetX))
     else
-        -- Calculate anchor data from center position (new/unmoved component)
         anchorX, anchorY, offsetX, offsetY, justifyH = CalculateAnchor(startX, startY, halfW, halfH)
-        print("[CreateDraggable] " .. key .. " CALCULATED: anchorX=" .. tostring(anchorX) .. " offsetX=" .. tostring(offsetX))
     end
     
     -- Store anchor data on container
@@ -570,7 +587,7 @@ local function CreateDraggableComponent(preview, key, sourceComponent, startX, s
     container.offsetX = offsetX
     container.offsetY = offsetY
     container.justifyH = justifyH
-    print("[CreateDraggable] STORED on container: " .. key .. " offsetX=" .. tostring(container.offsetX))
+
     
     -- Build anchor point for positioning (matches real frame logic)
     local anchorPoint = BuildAnchorPoint(anchorX, anchorY)
@@ -741,7 +758,7 @@ local function CreateDraggableComponent(preview, key, sourceComponent, startX, s
     end)
     
     container:SetScript("OnDragStop", function(self)
-        print("[OnDragStop] " .. key .. " FIRED!")
+
         self.isDragging = false
         self.border:SetColorTexture(0.3, 0.8, 0.3, 0)
         
@@ -764,7 +781,7 @@ local function CreateDraggableComponent(preview, key, sourceComponent, startX, s
             self:SetPoint("CENTER", preview, anchorPoint, finalX, finalY)
         end
         
-        print("[OnDragStop] Final: anchorX=" .. tostring(self.anchorX) .. " offsetX=" .. tostring(self.offsetX) .. " justifyH=" .. tostring(self.justifyH))
+
     end)
     
     -- Hover effects + nudge tracking
@@ -1019,15 +1036,13 @@ function Dialog:Apply()
         local offsetY = comp.offsetY
         local justifyH = comp.justifyH
         
-        print("[Apply] " .. key .. " anchorX=" .. tostring(anchorX) .. " offsetX=" .. tostring(offsetX) .. " justifyH=" .. tostring(justifyH))
+
         
         -- If anchor data not set (component wasn't moved), calculate from posX/posY
         if not anchorX then
             local posX = comp.posX or 0
             local posY = comp.posY or 0
-            print("[Apply]   Fallback: calculating from posX=" .. posX .. " posY=" .. posY)
             anchorX, anchorY, offsetX, offsetY, justifyH = CalculateAnchor(posX, posY, halfWidth, halfHeight)
-            print("[Apply]   Calculated: anchorX=" .. tostring(anchorX) .. " offsetX=" .. tostring(offsetX))
         end
         
         -- Save EDGE-RELATIVE format (matches what UnitButton expects)
