@@ -666,6 +666,21 @@ function UnitButtonMixin:ApplyComponentPositions()
     if positions.HealthText and self.HealthText then
         ApplyEdgePosition(self.HealthText, self.TextFrame, positions.HealthText, width, height)
     end
+    
+    -- Apply LevelText position if saved (TargetFrame, FocusFrame)
+    if positions.LevelText and self.LevelText then
+        ApplyEdgePosition(self.LevelText, self, positions.LevelText, width, height)
+    end
+    
+    -- Apply RareEliteIcon position if saved (TargetFrame, FocusFrame)
+    if positions.RareEliteIcon and self.RareEliteIcon then
+        ApplyEdgePosition(self.RareEliteIcon, self, positions.RareEliteIcon, width, height)
+    end
+    
+    -- Apply CombatIcon position if saved (PlayerFrame)
+    if positions.CombatIcon and self.CombatIcon then
+        ApplyEdgePosition(self.CombatIcon, self, positions.CombatIcon, width, height)
+    end
 end
 
 function UnitButtonMixin:SetBorder(size)

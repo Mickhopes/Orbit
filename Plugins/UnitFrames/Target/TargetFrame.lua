@@ -15,8 +15,15 @@ local Plugin = Orbit:RegisterPlugin("Target Frame", SYSTEM_ID, {
         ShowAuras = true,
         AuraSize = 20,
         MaxBuffs = 16,
-        ShowLevel = "Right",
-        ShowElite = "Right",
+        ShowLevel = true,
+        ShowElite = true,
+        -- Default component positions (Canvas Mode is single source of truth)
+        ComponentPositions = {
+            Name = { anchorX = "LEFT", offsetX = 5, anchorY = "CENTER", offsetY = 0, justifyH = "LEFT" },
+            HealthText = { anchorX = "RIGHT", offsetX = 5, anchorY = "CENTER", offsetY = 0, justifyH = "RIGHT" },
+            LevelText = { anchorX = "RIGHT", offsetX = -4, anchorY = "TOP", offsetY = 0, justifyH = "LEFT" },
+            RareEliteIcon = { anchorX = "RIGHT", offsetX = -2, anchorY = "BOTTOM", offsetY = 0, justifyH = "CENTER" },
+        },
     },
 }, Orbit.Constants.PluginGroups.UnitFrames)
 
@@ -33,30 +40,20 @@ function Plugin:AddSettings(dialog, systemFrame)
         hideNativeSettings = true,
         controls = {
             {
-                type = "dropdown",
+                type = "checkbox",
                 key = "ShowLevel",
                 label = "Show Level",
-                options = {
-                    { text = "Right", value = "Right" },
-                    { text = "Left", value = "Left" },
-                    { text = "Hide", value = "Hide" },
-                },
-                default = "Right",
+                default = true,
                 onChange = function(val)
                     self:SetSetting(TARGET_FRAME_INDEX, "ShowLevel", val)
                     self:UpdateVisualsExtended(self.frame, TARGET_FRAME_INDEX)
                 end,
             },
             {
-                type = "dropdown",
+                type = "checkbox",
                 key = "ShowElite",
-                label = "Show Elite",
-                options = {
-                    { text = "Right", value = "Right" },
-                    { text = "Left", value = "Left" },
-                    { text = "Hide", value = "Hide" },
-                },
-                default = "Right",
+                label = "Show Elite Icon",
+                default = true,
                 onChange = function(val)
                     self:SetSetting(TARGET_FRAME_INDEX, "ShowElite", val)
                     self:UpdateVisualsExtended(self.frame, TARGET_FRAME_INDEX)
@@ -190,6 +187,35 @@ function Plugin:OnLoad()
     if not self.frame.LevelText then
         self.frame.LevelText = self.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         self.frame.LevelText:SetPoint("TOPLEFT", self.frame.Health, "TOPRIGHT", 4, 0)
+    end
+
+    -- Create RareEliteIcon early so it can be registered with ComponentDrag
+    if not self.frame.RareEliteIcon then
+        self.frame.RareEliteIcon = self.frame:CreateTexture(nil, "OVERLAY")
+        self.frame.RareEliteIcon:SetSize(16, 16)
+        self.frame.RareEliteIcon:SetPoint("BOTTOMLEFT", self.frame, "BOTTOMRIGHT", 2, 0)
+        self.frame.RareEliteIcon:Hide()
+    end
+
+    -- Register LevelText and RareEliteIcon for component drag with persistence callbacks
+    local pluginRef = self
+    if OrbitEngine.ComponentDrag then
+        OrbitEngine.ComponentDrag:Attach(self.frame.LevelText, self.frame, {
+            key = "LevelText",
+            onPositionChange = function(component, anchorX, anchorY, offsetX, offsetY, justifyH)
+                local positions = pluginRef:GetSetting(TARGET_FRAME_INDEX, "ComponentPositions") or {}
+                positions.LevelText = { anchorX = anchorX, anchorY = anchorY, offsetX = offsetX, offsetY = offsetY, justifyH = justifyH }
+                pluginRef:SetSetting(TARGET_FRAME_INDEX, "ComponentPositions", positions)
+            end
+        })
+        OrbitEngine.ComponentDrag:Attach(self.frame.RareEliteIcon, self.frame, {
+            key = "RareEliteIcon",
+            onPositionChange = function(component, anchorX, anchorY, offsetX, offsetY, justifyH)
+                local positions = pluginRef:GetSetting(TARGET_FRAME_INDEX, "ComponentPositions") or {}
+                positions.RareEliteIcon = { anchorX = anchorX, anchorY = anchorY, offsetX = offsetX, offsetY = offsetY, justifyH = justifyH }
+                pluginRef:SetSetting(TARGET_FRAME_INDEX, "ComponentPositions", positions)
+            end
+        })
     end
 
     local originalOnEvent = self.frame:GetScript("OnEvent")

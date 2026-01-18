@@ -98,15 +98,12 @@ function Mixin:UpdateClassificationVisuals(frame, systemIndex)
 
     local icon = frame.RareEliteIcon
 
-    -- Positioning
-    icon:ClearAllPoints()
-    if showElite == "Left" then
-        -- Anchor BottomRight of icon to BottomLeft of frame (outside left)
-        icon:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT", -2, 0)
-    else
-        -- Default / "Right" / true
-        -- Anchor BottomLeft of icon to BottomRight of frame (outside right)
-        icon:SetPoint("BOTTOMLEFT", frame, "BOTTOMRIGHT", 2, 0)
+    -- Positioning: Only set default position if no Canvas Mode position saved
+    -- Canvas Mode positions are applied via ApplyComponentPositions
+    local positions = self:GetSetting(systemIndex, "ComponentPositions")
+    if not (positions and positions.RareEliteIcon) then
+        icon:ClearAllPoints()
+        icon:SetPoint("BOTTOMLEFT", frame, "BOTTOMRIGHT", 2, 0)  -- Default: right side
     end
 
     if isElite then
