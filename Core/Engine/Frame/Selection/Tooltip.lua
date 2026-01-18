@@ -183,21 +183,31 @@ function Tooltip:ShowComponentPosition(component, key, anchorX, anchorY, posX, p
     local textHeight = self.positionTooltip.text:GetStringHeight()
     self.positionTooltip:SetSize(textWidth + 16, textHeight + 12)
 
-    -- Position near cursor (edge-aware)
+    -- Position at bottom-right of cursor
     local cursorX, cursorY = GetCursorPosition()
     local uiScale = UIParent:GetEffectiveScale()
     cursorX = cursorX / uiScale
     cursorY = cursorY / uiScale
 
-    local screenWidth = GetScreenWidth()
     local tooltipWidth = self.positionTooltip:GetWidth()
+    local tooltipHeight = self.positionTooltip:GetHeight()
+    local screenWidth = GetScreenWidth()
+    local screenHeight = GetScreenHeight()
+
+    -- Default: bottom-right of cursor (tooltip's TOPLEFT at cursor position + offset)
+    local offsetX = 15
+    local offsetY = -15
+    
+    -- Adjust if would go off screen
+    if cursorX + offsetX + tooltipWidth > screenWidth then
+        offsetX = -tooltipWidth - 5  -- Flip to left of cursor
+    end
+    if cursorY + offsetY - tooltipHeight < 0 then
+        offsetY = 15  -- Flip to above cursor
+    end
 
     self.positionTooltip:ClearAllPoints()
-    if cursorX + tooltipWidth + 30 > screenWidth then
-        self.positionTooltip:SetPoint("RIGHT", UIParent, "BOTTOMLEFT", cursorX - 20, cursorY)
-    else
-        self.positionTooltip:SetPoint("LEFT", UIParent, "BOTTOMLEFT", cursorX + 20, cursorY)
-    end
+    self.positionTooltip:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", cursorX + offsetX, cursorY + offsetY)
 
     -- Show and reset alpha
     self.positionTooltip:SetAlpha(1)

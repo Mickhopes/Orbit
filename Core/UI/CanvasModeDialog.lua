@@ -648,39 +648,72 @@ local function CreateDraggableComponent(preview, key, sourceComponent, startX, s
             -- Calculate anchor data using CalculateAnchor (includes CENTER_THRESHOLD)
             local anchorX, anchorY, edgeOffX, edgeOffY, justifyH = CalculateAnchor(centerRelX, centerRelY, halfW, halfH)
             
-            -- For FontStrings, recalculate edge offset from actual edge position
+            -- For FontStrings, calculate edge offset based on JUSTIFY edge (not anchor edge)
+            -- This prevents jarring jumps when justify flips
             if self.isFontString then
+                local isOutsideLeft = centerRelX < -halfW
+                local isOutsideRight = centerRelX > halfW
+                
                 if anchorX == "LEFT" then
-                    -- Distance from preview LEFT to container LEFT
-                    local containerLeft = newCenterX - containerW / 2
-                    edgeOffX = (containerLeft - preview:GetLeft()) / PREVIEW_SCALE
-                    justifyH = "LEFT"
+                    justifyH = isOutsideLeft and "RIGHT" or "LEFT"
+                    if justifyH == "LEFT" then
+                        -- Text anchored by LEFT edge: distance from frame LEFT to container LEFT
+                        local containerLeft = newCenterX - containerW / 2
+                        edgeOffX = (containerLeft - preview:GetLeft()) / PREVIEW_SCALE
+                    else
+                        -- Text anchored by RIGHT edge (outside): distance from frame LEFT to container RIGHT
+                        local containerRight = newCenterX + containerW / 2
+                        edgeOffX = (containerRight - preview:GetLeft()) / PREVIEW_SCALE
+                    end
                 elseif anchorX == "RIGHT" then
-                    -- Distance from container RIGHT to preview RIGHT
-                    local containerRight = newCenterX + containerW / 2
-                    edgeOffX = (preview:GetRight() - containerRight) / PREVIEW_SCALE
-                    justifyH = "RIGHT"
+                    justifyH = isOutsideRight and "LEFT" or "RIGHT"
+                    if justifyH == "RIGHT" then
+                        -- Text anchored by RIGHT edge: distance from container RIGHT to frame RIGHT
+                        local containerRight = newCenterX + containerW / 2
+                        edgeOffX = (preview:GetRight() - containerRight) / PREVIEW_SCALE
+                    else
+                        -- Text anchored by LEFT edge (outside): distance from container LEFT to frame RIGHT
+                        local containerLeft = newCenterX - containerW / 2
+                        edgeOffX = (preview:GetRight() - containerLeft) / PREVIEW_SCALE
+                    end
                 else
                     edgeOffX = 0
                     justifyH = "CENTER"
                 end
             end
             
-            -- Build anchor point and position the container with proper anchoring
+            -- Build anchor point and position the container
+            -- IMPORTANT: During drag, always use CENTER anchor for smooth movement
+            -- The edge-based anchoring is applied on drop (prevents jarring jumps when justify changes)
             local anchorPoint = BuildAnchorPoint(anchorX, anchorY)
-            local finalX = edgeOffX * PREVIEW_SCALE
-            local finalY = edgeOffY * PREVIEW_SCALE
-            if anchorX == "RIGHT" then finalX = -finalX end
-            if anchorY == "TOP" then finalY = -finalY end
             
-            self:ClearAllPoints()
-            if self.isFontString and justifyH ~= "CENTER" then
-                self:SetPoint(justifyH, preview, anchorPoint, finalX, finalY)
+            -- Position by CENTER relative to anchor point during drag
+            -- This keeps movement smooth regardless of justify changes
+            local centerOffX = centerRelX
+            local centerOffY = centerRelY
+            
+            -- Convert center-relative to anchor-relative offsets for display
+            if anchorX == "LEFT" then
+                centerOffX = centerRelX + halfW  -- Distance from left edge
+            elseif anchorX == "RIGHT" then
+                centerOffX = -(centerRelX - halfW)  -- Distance from right edge (positive = inward)
             else
-                self:SetPoint("CENTER", preview, anchorPoint, finalX, finalY)
+                centerOffX = 0
             end
             
-            -- Update text alignment
+            if anchorY == "BOTTOM" then
+                centerOffY = centerRelY + halfH
+            elseif anchorY == "TOP" then
+                centerOffY = -(centerRelY - halfH)
+            else
+                centerOffY = 0
+            end
+            
+            -- Always position by CENTER during drag for smooth movement
+            self:ClearAllPoints()
+            self:SetPoint("CENTER", preview, "CENTER", centerRelX * PREVIEW_SCALE, centerRelY * PREVIEW_SCALE)
+            
+            -- Update text alignment in preview
             if self.visual and self.isFontString then
                 ApplyTextAlignment(self, self.visual, justifyH)
             end
