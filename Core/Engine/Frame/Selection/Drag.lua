@@ -16,8 +16,14 @@ local function OnDragUpdate(selectionOverlay, elapsed)
     local parent = selectionOverlay.parent
     local Selection = Engine.FrameSelection
 
-    -- Optimization: Throttle check?
-    -- For smoothness, every frame is better, logic is cheap enough.
+    -- Skip anchor visuals if anchoring is disabled
+    local anchoringEnabled = not Orbit.db or not Orbit.db.GlobalSettings 
+        or Orbit.db.GlobalSettings.AnchoringEnabled ~= false
+    if not anchoringEnabled then
+        -- Just show position tooltip without anchor detection
+        Engine.SelectionTooltip:ShowPosition(parent, Selection, true)
+        return
+    end
 
     local targets = Selection:GetSnapTargets(parent)
     local closestX, closestY, anchorTarget, anchorEdge = Engine.FrameSnap:DetectSnap(

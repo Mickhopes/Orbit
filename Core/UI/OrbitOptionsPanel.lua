@@ -186,6 +186,13 @@ local function GetEditModeSchema()
             },
             {
                 type = "checkbox",
+                key = "ShowOrbitFrames",
+                label = "Show Orbit Frames",
+                default = true,
+                tooltip = "Show selection overlays for Orbit-owned frames in Edit Mode.",
+            },
+            {
+                type = "checkbox",
                 key = "AnchoringEnabled",
                 label = "Enable Frame Anchoring",
                 default = true,
@@ -203,6 +210,7 @@ local function GetEditModeSchema()
             local d = Orbit.db.GlobalSettings
             if d then
                 d.ShowBlizzardFrames = true
+                d.ShowOrbitFrames = true
                 d.AnchoringEnabled = true
                 d.EditModeColor = { r = 0.7, g = 0.6, b = 1.0, a = 1.0 }
             end

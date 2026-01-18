@@ -469,8 +469,20 @@ end
 
 function Selection:RefreshVisuals()
     -- 1. Update Orbit Selections
+    local showOrbit = true
+    if Orbit.db.GlobalSettings and Orbit.db.GlobalSettings.ShowOrbitFrames == false then
+        showOrbit = false
+    end
+
     for frame, selection in pairs(self.selections) do
-        if selection:IsShown() then
+        if selection.isOrbitSelection then
+            if showOrbit then
+                self:UpdateVisuals(frame, selection)
+            else
+                selection:SetAlpha(0)
+                selection:EnableMouse(false)
+            end
+        else
             self:UpdateVisuals(frame, selection)
         end
     end
@@ -627,8 +639,21 @@ function Selection:UpdateVisuals(frame, selection)
 
         if isAnchored then
             if selection.isOrbitSelection then
-                local c = Orbit.db.GlobalSettings and Orbit.db.GlobalSettings.EditModeColor or Engine.Constants.Frame.EditModeColor
-                TintSelection(selection, c.r, c.g, c.b, true)
+                local showOrbit = true
+                if Orbit.db.GlobalSettings and Orbit.db.GlobalSettings.ShowOrbitFrames == false then
+                    showOrbit = false
+                end
+
+                if showOrbit then
+                    local c = Orbit.db.GlobalSettings and Orbit.db.GlobalSettings.EditModeColor or Engine.Constants.Frame.EditModeColor
+                    TintSelection(selection, c.r, c.g, c.b, true)
+                    selection:SetAlpha(1)
+                    selection:EnableMouse(true)
+                else
+                    selection:SetAlpha(0)
+                    selection:EnableMouse(false)
+                    return
+                end
             else
                 local showNative = true
                 if Orbit.db.GlobalSettings and Orbit.db.GlobalSettings.ShowBlizzardFrames == false then
@@ -652,8 +677,21 @@ function Selection:UpdateVisuals(frame, selection)
             end
         else
             if selection.isOrbitSelection then
-                local c = Orbit.db.GlobalSettings and Orbit.db.GlobalSettings.EditModeColor or Engine.Constants.Frame.EditModeColor
-                TintSelection(selection, c.r, c.g, c.b, true)
+                local showOrbit = true
+                if Orbit.db.GlobalSettings and Orbit.db.GlobalSettings.ShowOrbitFrames == false then
+                    showOrbit = false
+                end
+
+                if showOrbit then
+                    local c = Orbit.db.GlobalSettings and Orbit.db.GlobalSettings.EditModeColor or Engine.Constants.Frame.EditModeColor
+                    TintSelection(selection, c.r, c.g, c.b, true)
+                    selection:SetAlpha(1)
+                    selection:EnableMouse(true)
+                else
+                    selection:SetAlpha(0)
+                    selection:EnableMouse(false)
+                    return
+                end
             else
                 local showNative = true
                 if Orbit.db.GlobalSettings and Orbit.db.GlobalSettings.ShowBlizzardFrames == false then
