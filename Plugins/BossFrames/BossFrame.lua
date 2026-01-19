@@ -735,9 +735,13 @@ function Plugin:OnLoad()
 
     -- Register secure visibility driver for the container
     -- This handles Showing/Hiding the container (and thus all boss frames) securely in combat
-    local visibilityDriver =
-        "[petbattle] hide; [@boss1,exists] show; [@boss2,exists] show; [@boss3,exists] show; [@boss4,exists] show; [@boss5,exists] show; hide"
-    RegisterAttributeDriver(self.container, "state-visibility", visibilityDriver)
+    -- NOTE: Must use RegisterStateDriver with "visibility" (not RegisterAttributeDriver with "state-visibility")
+    -- per the "Visibility Driver Failure" pattern documented in the KI
+    local visibilityDriver = "[petbattle] hide; [@boss1,exists] show; [@boss2,exists] show; [@boss3,exists] show; [@boss4,exists] show; [@boss5,exists] show; hide"
+    RegisterStateDriver(self.container, "visibility", visibilityDriver)
+    
+    -- Explicit Show Bridge: Ensure container is active to receive first state evaluation
+    self.container:Show()
 
     -- Position frames (stacked vertically)
     self:PositionFrames()

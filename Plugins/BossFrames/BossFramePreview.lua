@@ -51,7 +51,8 @@ function Orbit.BossFramePreviewMixin:ShowPreview()
     end
 
     -- Disable Visibility Driver for preview so we can manually Show frames
-    UnregisterAttributeDriver(self.container, "state-visibility")
+    -- NOTE: Must use UnregisterStateDriver with "visibility" to match OnLoad's RegisterStateDriver
+    UnregisterStateDriver(self.container, "visibility")
     self.container:Show()
 
     -- Disable UnitWatch for preview so we can manually Show frames
@@ -338,79 +339,81 @@ function Orbit.BossFramePreviewMixin:ShowPreviewDebuffs(frame, numDebuffsToShow)
 end
 
 function Orbit.BossFramePreviewMixin:HidePreview()
-    -- PREVIEW IS BLOCKED IN COMBAT (Protected function calls)
+    -- PREVIEW STATE CLEANUP (always safe - non-protected operations)
+    -- Clear preview flag and update to real data first
+    if self.frames then
+        for i, frame in ipairs(self.frames) do
+            frame.preview = nil
+            
+            -- Clean up preview-only visuals (these are not protected)
+            if frame.previewDebuffs then
+                for _, icon in ipairs(frame.previewDebuffs) do
+                    icon:Hide()
+                end
+                wipe(frame.previewDebuffs)
+            end
+            
+            -- Hide cast bar preview (will be controlled by actual casts)
+            if frame.CastBar then
+                frame.CastBar:Hide()
+            end
+            
+            -- Update to real boss data if it exists
+            if frame.UpdateAll then
+                frame:UpdateAll()
+            end
+        end
+    end
+
+    -- PROTECTED OPERATIONS (require out of combat)
     if InCombatLockdown() then
-        -- Register event to hide when combat ends
+        -- Register event to complete cleanup when combat ends
         if not self.previewCleanupFrame then
             self.previewCleanupFrame = CreateFrame("Frame")
             self.previewCleanupFrame:SetScript("OnEvent", function(f, event)
                 if event == "PLAYER_REGEN_ENABLED" then
                     f:UnregisterEvent("PLAYER_REGEN_ENABLED")
-                    self:HidePreview()
+                    self:RestoreVisibilityDrivers()
                 end
             end)
         end
         self.previewCleanupFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
-
-        -- Try to cleanup non-secure visuals immediately to reduce clutter
-        -- (Only if it's safe - i.e. not touching protected frames)
-        if self.frames then
-            for i, frame in ipairs(self.frames) do
-                -- Visually hide the main frame immediately so it doesn't linger
-                frame:SetAlpha(0)
-
-                if frame.previewDebuffs then
-                    for _, icon in ipairs(frame.previewDebuffs) do
-                        icon:Hide()
-                    end
-                end
-                if frame.CastBar then
-                    frame.CastBar:Hide()
-                end
-            end
-        end
         
+        -- Frames stay visible with real data during combat
+        -- The state driver will be restored after combat ends
         return
-    else
-        -- Clean up event if we reached here safely (e.g. called manually or after regression)
-        if self.previewCleanupFrame then
-            self.previewCleanupFrame:UnregisterEvent("PLAYER_REGEN_ENABLED")
-        end
     end
+    
+    -- Clean up event registration if we made it here out of combat
+    if self.previewCleanupFrame then
+        self.previewCleanupFrame:UnregisterEvent("PLAYER_REGEN_ENABLED")
+    end
+    
+    -- Restore visibility drivers immediately since we're out of combat
+    self:RestoreVisibilityDrivers()
+end
 
-    if not self.frames then
+-- Helper function to restore protected visibility drivers (call only out of combat)
+function Orbit.BossFramePreviewMixin:RestoreVisibilityDrivers()
+    if InCombatLockdown() then
+        return -- Safety check
+    end
+    
+    if not self.frames or not self.container then
         return
     end
 
     -- Restore Visibility Driver for normal gameplay
-    local visibilityDriver =
-        "[@boss1,exists] show; [@boss2,exists] show; [@boss3,exists] show; [@boss4,exists] show; [@boss5,exists] show; hide"
-    RegisterAttributeDriver(self.container, "state-visibility", visibilityDriver)
+    local visibilityDriver = "[petbattle] hide; [@boss1,exists] show; [@boss2,exists] show; [@boss3,exists] show; [@boss4,exists] show; [@boss5,exists] show; hide"
+    RegisterStateDriver(self.container, "visibility", visibilityDriver)
+    self.container:Show() -- Explicit Show Bridge
 
     for i, frame in ipairs(self.frames) do
-        frame.preview = nil
-        
-        -- Restore visual visibility (in case it was hidden during combat deferral)
-        frame:SetAlpha(1) 
+        -- Ensure alpha is visible
+        frame:SetAlpha(1)
 
         -- Restore UnitWatch for normal gameplay (handles combat visibility)
         RegisterUnitWatch(frame)
-
-        -- Hide and clear preview debuffs to release memory
-        if frame.previewDebuffs then
-            for _, icon in ipairs(frame.previewDebuffs) do
-                icon:Hide()
-                icon:ClearAllPoints()
-            end
-            -- Clear the table but keep the frame references for reuse
-            -- (frames are parented to debuffContainer so they won't leak)
-            wipe(frame.previewDebuffs)
-        end
-
-        -- Hide cast bar preview (will be controlled by actual casts)
-        if frame.CastBar then
-            frame.CastBar:Hide()
-        end
     end
 
     -- Update container size
