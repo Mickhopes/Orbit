@@ -274,6 +274,11 @@ function Orbit:SetPluginEnabled(name, enabled)
         self.runtime.DisabledPlugins = {}
     end
     self.runtime.DisabledPlugins[name] = not enabled
+
+    -- Notify subscribers so subordinate plugins can react
+    if self.EventBus then
+        self.EventBus:Fire("ORBIT_PLUGIN_STATE_CHANGED", name, enabled)
+    end
 end
 
 -- [ EVENT HANDLERS ]--------------------------------------------------------------------------------
