@@ -712,6 +712,9 @@ function Plugin:OnLoad()
     for i = 1, MAX_BOSS_FRAMES do
         self.frames[i] = CreateBossFrame(i, self)
         self.frames[i]:SetParent(self.container)
+        
+        -- Register unit watch for visibility (shows frame when boss unit exists)
+        RegisterUnitWatch(self.frames[i])
 
         -- Setup cast bar hooks (combat-safe deferred - native spellbars may not exist yet)
         local bossIndex = i -- Capture for closure
