@@ -17,7 +17,7 @@ local TITLE_PADDING = 40 -- Space from top for Title
 -------------------------------------------------
 -- CREATE DIALOG FRAME
 -------------------------------------------------
-local Dialog = CreateFrame("Frame", "OrbitSettingsDialog", UIParent, "BackdropTemplate")
+local Dialog = CreateFrame("Frame", "OrbitSettingsDialog", UIParent)
 Dialog:SetSize(DIALOG_WIDTH, DIALOG_MIN_HEIGHT)
 Dialog:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 220, -20)
 Dialog:SetFrameStrata("DIALOG")
@@ -28,16 +28,12 @@ Dialog:EnableMouse(true)
 Dialog:RegisterForDrag("LeftButton")
 Dialog:Hide()
 
--- Backdrop (matches Blizzard's DialogBorderTranslucentTemplate style)
-Dialog:SetBackdrop({
-    bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
-    edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-    tile = true,
-    tileSize = 32,
-    edgeSize = 32,
-    insets = { left = 11, right = 12, top = 12, bottom = 11 },
-})
-Dialog:SetBackdropColor(0.09, 0.09, 0.09, 0.95)
+-- Metallic nine-slice border matching Blizzard's EditMode dialogs
+Dialog.Border = CreateFrame("Frame", nil, Dialog, "DialogBorderTranslucentTemplate")
+Dialog.Border:SetAllPoints(Dialog)
+
+-- Ensure proper layering
+Dialog.Border:SetFrameLevel(Dialog:GetFrameLevel())
 
 -- Drag handlers
 Dialog:SetScript("OnDragStart", function(self)
