@@ -67,7 +67,8 @@ local function UpdateFrameLayout(frame, borderSize)
     end -- Guard against uninitialized height
 
     local powerHeight = height * (POWER_BAR_HEIGHT_RATIO or 0.2)
-    local inset = math.max(1, borderSize) -- Ensure minimal inset
+    -- Use the actual pixel-scaled border size if available, otherwise the passed borderSize
+    local inset = frame.borderPixelSize or borderSize or 0
 
     if frame.Power then
         frame.Power:ClearAllPoints()
