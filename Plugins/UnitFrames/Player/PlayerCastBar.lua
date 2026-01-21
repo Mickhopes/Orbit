@@ -177,7 +177,7 @@ function Plugin:OnLoad()
         OrbitEngine.Pixel:Enforce(CastBar)
     end
     CastBar:SetFrameStrata("MEDIUM")
-    CastBar:SetFrameLevel(100)
+    CastBar:SetFrameLevel(10)
     CastBar:SetStatusBarTexture("")
     CastBar:SetMinMaxValues(0, 1)
     CastBar:SetValue(0)
