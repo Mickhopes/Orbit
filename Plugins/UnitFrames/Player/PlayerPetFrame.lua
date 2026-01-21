@@ -123,16 +123,22 @@ function Plugin:UpdateVisibility()
 
     if isEditMode then
         -- Disable automatic unit-based hiding in Edit Mode
-        UnregisterUnitWatch(self.frame)
+        if not InCombatLockdown() then
+            UnregisterUnitWatch(self.frame)
+        end
         
         -- Always show in Edit Mode for positioning, even without a pet
-        self.frame:Show()
+        Orbit:SafeAction(function()
+            self.frame:Show()
+        end)
         self.frame:SetAlpha(hasPet and 1 or 0.5) -- Dimmed if no pet
         return
     end
 
     -- Re-enable automatic unit-based visibility outside Edit Mode
-    RegisterUnitWatch(self.frame)
+    if not InCombatLockdown() then
+        RegisterUnitWatch(self.frame)
+    end
     self.frame:SetAlpha(1)
 end
 

@@ -964,10 +964,6 @@ function Dialog:Open(frame, plugin, systemIndex)
     local frameW = canvasFrame:GetWidth()
     local frameH = canvasFrame:GetHeight()
     
-    -- DEBUG: Print dimensions to trace positioning issue
-    print("[CanvasMode] frameW:", frameW, "frameH:", frameH)
-    print("[CanvasMode] preview.sourceWidth:", self.previewFrame.sourceWidth, "preview.sourceHeight:", self.previewFrame.sourceHeight)
-    
     local DEFAULTS = {
         Name = "Name",
         HealthText = "100%",
