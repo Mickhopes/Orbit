@@ -1,5 +1,16 @@
 package-as: Orbit
 
+move-folders:
+  Orbit/Orbit: Orbit
+  Orbit/Orbit_ActionBars: Orbit_ActionBars
+  Orbit/Orbit_BossFrames: Orbit_BossFrames
+  Orbit/Orbit_CooldownManager: Orbit_CooldownManager
+  Orbit/Orbit_MenuItems: Orbit_MenuItems
+  Orbit/Orbit_Misc: Orbit_Misc
+  Orbit/Orbit_PartyFrames: Orbit_PartyFrames
+  Orbit/Orbit_PlayerUtilities: Orbit_PlayerUtilities
+  Orbit/Orbit_UnitFrames: Orbit_UnitFrames
+
 ignore:
   - .agent
   - .env
