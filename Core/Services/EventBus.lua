@@ -99,16 +99,9 @@ function EventBus:Fire(event, ...)
         if listener.context then
             if n == 0 then
                 success, err = pcall(listener.callback, listener.context)
-            elseif n == 1 then
-                success, err = pcall(listener.callback, listener.context, ...)
-            elseif n == 2 then
-                success, err = pcall(listener.callback, listener.context, ...)
-            elseif n == 3 then
-                success, err = pcall(listener.callback, listener.context, ...)
             else
-                -- Fallback for rare high-arg-count events (still allocates but uncommon)
-                local args = { ... }
-                success, err = pcall(function() listener.callback(listener.context, unpack(args)) end)
+                -- All n >= 1 cases use the same vararg passthrough
+                success, err = pcall(listener.callback, listener.context, ...)
             end
         else
             if n == 0 then

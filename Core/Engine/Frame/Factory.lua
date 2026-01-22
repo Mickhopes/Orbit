@@ -231,7 +231,6 @@ function FrameFactory:CreateButtonContainer(name, plugin, opts)
     local maxButtons = opts.maxButtons or 0
     for i = 1, maxButtons do
         local btn = CreateFrame("Frame", nil, container)
-        btn:SetScript("OnEnter", function() end)
 
         -- Standard SetActive API
         btn.SetActive = function(self, active)

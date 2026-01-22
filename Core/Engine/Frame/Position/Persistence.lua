@@ -165,9 +165,7 @@ function Persistence:AttachSettingsListener(frame, plugin, systemIndex)
         -- Save position or anchor state via PositionManager (ephemeral)
         if Engine.PositionManager then
             if point == "ANCHORED" then
-                Engine.PositionManager:SetAnchor(f, x, y, nil, nil) -- x=target, y=edge. padding/align retrieved inside PM? No, PM SetAnchor args: target, edge, padding, align
-
-                -- We need to retrieve padding/align here to pass to PM
+                -- Retrieve padding/align from anchor to pass to PositionManager
                 local padding = 0
                 local align = nil
                 if Engine.FrameAnchor and Engine.FrameAnchor.anchors[f] then

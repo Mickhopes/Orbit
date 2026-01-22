@@ -29,6 +29,7 @@ C.PluginGroups = {
     MenuItems = "Menu Items",
     BossFrames = "Boss Frames",
     Misc = "Misc",
+    PartyFrames = "Party Frames",
 }
 
 C.Footer = {

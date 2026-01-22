@@ -33,7 +33,7 @@ local Plugin = Orbit:RegisterPlugin("Party Frames", SYSTEM_ID, {
             HealthText = { anchorX = "RIGHT", offsetX = 5, anchorY = "CENTER", offsetY = 0, justifyH = "RIGHT" },
         },
     },
-}, Orbit.Constants.PluginGroups.UnitFrames)
+}, Orbit.Constants.PluginGroups.PartyFrames)
 
 -- Apply Mixins (including AuraMixin for debuff display)
 Mixin(Plugin, Orbit.UnitFrameMixin, Orbit.PartyFramePreviewMixin, Orbit.AuraMixin)

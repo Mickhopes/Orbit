@@ -17,6 +17,7 @@ CanvasMode.currentFrame = nil
 local CANVAS_BORDER_COLOR = { r = 0.3, g = 0.8, b = 0.3, a = 1.0 } -- Green border for canvas mode
 local CANVAS_BORDER_SIZE = 3  -- Thicker border for visibility
 local CANVAS_BACKGROUND_COLOR = { r = 0, g = 0, b = 0, a = 0.4 } -- Dark background at 40% opacity
+local OVERLAY_COLOR = { r = 0.3, g = 0.8, b = 0.3, a = 0.3 } -- Green overlay for native frames in canvas mode
 local CANVAS_PADDING = 25  -- Must match ComponentDrag PADDING
 local INSET = 4
 
