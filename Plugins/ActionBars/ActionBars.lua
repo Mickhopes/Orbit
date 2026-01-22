@@ -430,7 +430,7 @@ function Plugin:CreateContainer(config)
     frame.anchorOptions = {
         x = true,
         y = true,
-        syncScale = true,
+        syncScale = false,
         syncDimensions = false,
     }
 
