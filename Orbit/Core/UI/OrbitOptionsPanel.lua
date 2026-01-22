@@ -686,7 +686,8 @@ local function Help()
     print("  |cFFAA77FF/orbit|r |cFF00D4FF- Toggle Edit Mode / Options|r")
     print("  |cFFAA77FF/orbit reset|r |cFF00D4FF- Reset CURRENT profile to defaults|r")
     print("  |cFFAA77FF/orbit hardreset|r |cFF00D4FF- Factory Reset (Wipe All Data)|r")
-    print("  |cFFAA77FF/orbit teleport|r |cFF00D4FF- Teleport Dock commands|r")
+    print("  |cFFAA77FF/orbit portal|r |cFF00D4FF- Portal Dock commands|r")
+    print("  |cFFAA77FF/orbit refresh <plugin>|r |cFF00D4FF- Force refresh a plugin|r")
 end
 
 SlashCmdList["ORBIT"] = function(msg)
@@ -720,14 +721,42 @@ SlashCmdList["ORBIT"] = function(msg)
         StaticPopup_Show("ORBIT_CONFIRM_RESET", profile, nil, profile)
     elseif cmd == "hardreset" then
         StaticPopup_Show("ORBIT_CONFIRM_HARD_RESET")
-    elseif cmd == "teleport" or cmd == "tp" then
-        -- Teleport Dock sub-commands (delegated to Orbit_Teleport plugin if loaded)
+    elseif cmd == "portal" or cmd == "p" then
+        -- Portal Dock sub-commands (delegated to Orbit_Portal plugin if loaded)
         local subCmd = args[2] and args[2]:lower() or ""
-        local teleportPlugin = Orbit:GetPlugin("Orbit_Teleport")
-        if teleportPlugin and teleportPlugin.HandleCommand then
-            teleportPlugin:HandleCommand(subCmd)
+        local portalPlugin = Orbit:GetPlugin("Orbit_Portal")
+        if portalPlugin and portalPlugin.HandleCommand then
+            portalPlugin:HandleCommand(subCmd)
         else
-            Orbit:Print("Teleport Dock is not loaded.")
+            Orbit:Print("Portal Dock is not loaded.")
+        end
+    elseif cmd == "refresh" then
+        local subCmd = args[2] or ""
+        if subCmd == "" then
+            Orbit:Print("Usage: /orbit refresh <plugin_system_id>")
+            Orbit:Print("Example: /orbit refresh Orbit_CooldownViewer")
+            return
+        end
+
+        -- Clear icon region cache (helps visual plugins)
+        if Orbit.Skin and Orbit.Skin.Icons then
+            Orbit.Skin.Icons.regionCache = setmetatable({}, { __mode = "k" })
+        end
+
+        -- Find and refresh the plugin
+        local plugin = Orbit:GetPlugin(subCmd)
+        if plugin then
+            if plugin.ReapplyParentage then
+                plugin:ReapplyParentage()
+            end
+            if plugin.ApplyAll then
+                plugin:ApplyAll()
+            elseif plugin.ApplySettings then
+                plugin:ApplySettings()
+            end
+            Orbit:Print(subCmd .. " refreshed.")
+        else
+            Orbit:Print("Plugin not found: " .. subCmd)
         end
     else
         Orbit:Print("Unknown command: " .. cmd)

@@ -213,6 +213,38 @@ function Frame:AttachSettingsListener(frame, plugin, systemIndex)
     Persistence:AttachSettingsListener(frame, plugin, systemIndex)
 end
 
+-- [ ORIENTATION API ]-------------------------------------------------------------------------------
+
+--- Get the current orientation of a frame based on screen position
+---@param frame frame
+---@return string orientation "LEFT", "RIGHT", "TOP", or "BOTTOM"
+function Frame:GetOrientation(frame)
+    EnsureModules()
+    if Engine.FrameOrientation then
+        return Engine.FrameOrientation:DetectOrientation(frame)
+    end
+    return "LEFT"
+end
+
+--- Register a callback for orientation changes during Edit Mode drag
+---@param frame frame
+---@param callback function Called with (orientation) when orientation changes
+function Frame:RegisterOrientationCallback(frame, callback)
+    EnsureModules()
+    if Engine.FrameOrientation then
+        Engine.FrameOrientation:RegisterCallback(frame, callback)
+    end
+end
+
+--- Unregister orientation callback
+---@param frame frame
+function Frame:UnregisterOrientationCallback(frame)
+    EnsureModules()
+    if Engine.FrameOrientation then
+        Engine.FrameOrientation:UnregisterCallback(frame)
+    end
+end
+
 -- [ NATIVE FRAME INTEGRATION ]----------------------------------------------------------------------
 
 -- Native frame visuals handled by CanvasMode if needed

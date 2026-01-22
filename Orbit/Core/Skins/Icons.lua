@@ -39,15 +39,32 @@ function Icons:ApplyManualLayout(frame, icons, settings)
         return
     end
 
-    local w, h = Constants.Skin.DefaultIconSize, Constants.Skin.DefaultIconSize
-    if icons[1] then
-        w, h = icons[1]:GetSize()
+    -- Use baseIconSize from settings (authoritative) instead of reading potentially stale icon sizes
+    local baseSize = settings.baseIconSize or Constants.Skin.DefaultIconSize
+    local w, h = baseSize, baseSize
+
+    -- Apply aspect ratio to match ApplyCustom's geometry calculation
+    local aspectRatio = settings.aspectRatio or "1:1"
+    if aspectRatio ~= "1:1" then
+        local sw, sh = strsplit(":", aspectRatio)
+        if sw and sh then
+            local rw, rh = tonumber(sw), tonumber(sh)
+            if rw and rh and rw ~= rh then
+                h = w * (rh / rw)
+            end
+        elseif sw then
+            local ratio = tonumber(sw)
+            if ratio and ratio ~= 1 then
+                h = w / ratio
+            end
+        end
     end
-    if w < 1 then
-        w = 40
-    end
-    if h < 1 then
-        h = 40
+
+    -- Pixel snap for consistent rendering
+    if Pixel then
+        local scale = frame:GetEffectiveScale()
+        w = Pixel:Snap(w, scale)
+        h = Pixel:Snap(h, scale)
     end
 
     -- "Major" is the primary flow direction (Rows for Horiz, Cols for Vert)

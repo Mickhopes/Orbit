@@ -664,7 +664,7 @@ Orbit.Profile.defaults = {
                     Opacity = 100,
                 },
             },
-            ["Orbit_Teleport"] = {
+            ["Orbit_Portal"] = {
                 [1] = {
                     Anchor = false,
                     Position = {

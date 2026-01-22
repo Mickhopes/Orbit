@@ -70,6 +70,11 @@ function Drag:OnDragStart(selectionOverlay)
         parent:StartMoving()
         parent.orbitIsDragging = true
 
+        -- Start orientation tracking if enabled
+        if parent.orbitAutoOrient and Engine.FrameOrientation then
+            Engine.FrameOrientation:StartTracking(parent)
+        end
+
         -- Start Visual Update Loop
         selectionOverlay.lastAnchorTarget = nil
         selectionOverlay:SetScript("OnUpdate", OnDragUpdate)
@@ -159,6 +164,11 @@ function Drag:OnDragStop(selectionOverlay)
     end
 
     parent.orbitIsDragging = nil
+
+    -- Stop orientation tracking
+    if parent.orbitAutoOrient and Engine.FrameOrientation then
+        Engine.FrameOrientation:StopTracking(parent)
+    end
 end
 
 -- [ MOUSE DOWN (SELECTION) ]------------------------------------------------------------------------

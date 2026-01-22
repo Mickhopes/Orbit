@@ -67,6 +67,7 @@ Core\Engine\Frame\Selection\Tooltip.lua
 Core\Engine\Frame\Selection\Nudge.lua
 Core\Engine\Frame\Selection\Drag.lua
 Core\Engine\Frame\Selection\NativeHook.lua
+Core\Engine\Frame\Orientation.lua
 Core\Engine\Frame\Selection.lua
 Core\Engine\Frame\Factory.lua
 Core\Engine\Frame\Frame.lua
