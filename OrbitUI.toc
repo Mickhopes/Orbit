@@ -1,0 +1,13 @@
+package-as: Orbit
+
+move-folders:
+  Orbit: Orbit
+  Orbit_PluginName: Orbit_PluginName
+
+ignore:
+  - .agent
+  - .env
+  - .github
+  - .gitignore
+  - .vscode
+  - README.md
