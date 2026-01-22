@@ -425,6 +425,12 @@ function Icons:CalculateGeometry(frame, settings)
 end
 
 function Icons:ApplyCustom(icon, settings)
+    -- Reset scale to neutral (1.0) to prevent compounded scale from Blizzard
+    -- Individual icons may have been scaled by Blizzard systems (e.g. Personal Resource Display)
+    if icon.SetScale then
+        icon:SetScale(1)
+    end
+    
     local r = self:FindRegions(icon)
     local tex = r.icon
 

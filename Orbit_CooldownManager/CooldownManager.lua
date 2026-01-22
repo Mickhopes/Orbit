@@ -712,6 +712,11 @@ function Plugin:EnforceViewerParentage(viewer, anchor)
     if viewer:GetParent() ~= anchor then
         viewer:SetParent(anchor)
     end
+    
+    -- Reset viewer scale to neutral (1.0) to prevent compounded scale issues
+    -- Blizzard systems (e.g. Personal Resource Display) may have set a different scale
+    viewer:SetScale(1)
+    
     viewer:ClearAllPoints()
 
     local direction = self:GetGrowthDirection(anchor)
