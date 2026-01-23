@@ -201,13 +201,32 @@ local function ApplyAnchorPosition(child, parent, edge, padding, align, syncOpti
     end
 end
 
+-- Check if anchoring child to parent would create a circular dependency
+-- Walks up the anchor chain from parent to see if it eventually reaches child
+local function WouldCreateCycle(anchors, child, parent)
+    local visited = {}
+    local current = parent
+    while current do
+        if current == child then
+            return true -- Found child in parent's ancestor chain = cycle
+        end
+        if visited[current] then
+            break -- Already visited, prevent infinite loop from existing bad state
+        end
+        visited[current] = true
+        local anchor = anchors[current]
+        current = anchor and anchor.parent or nil
+    end
+    return false
+end
+
 function Anchor:CreateAnchor(child, parent, edge, padding, syncOptions, align, suppressApplySettings)
     if padding == nil then
         padding = DEFAULT_PADDING -- Default 2px gap
     end
 
-    -- Prevent circular anchoring
-    if self.anchors[parent] and self.anchors[parent].parent == child then
+    -- Prevent circular anchoring (checks full chain, not just immediate parent)
+    if WouldCreateCycle(self.anchors, child, parent) then
         return false
     end
 

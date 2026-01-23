@@ -31,7 +31,9 @@ local Plugin = Orbit:RegisterPlugin("Party Frames", SYSTEM_ID, {
         ComponentPositions = {
             Name = { anchorX = "LEFT", offsetX = 5, anchorY = "CENTER", offsetY = 0, justifyH = "LEFT" },
             HealthText = { anchorX = "RIGHT", offsetX = 5, anchorY = "CENTER", offsetY = 0, justifyH = "RIGHT" },
+            MarkerIcon = { anchorX = "CENTER", offsetX = 0, anchorY = "TOP", offsetY = -2 },
         },
+        ShowMarkerIcon = true,
     },
 }, Orbit.Constants.PluginGroups.PartyFrames)
 
@@ -457,6 +459,51 @@ local function UpdateIncomingSummon(frame, plugin)
     end
 end
 
+-- Marker Icon (Raid Target)
+local RAID_TARGET_TEXTURE_COLUMNS = 4
+local RAID_TARGET_TEXTURE_ROWS = 4
+
+local function UpdateMarkerIcon(frame, plugin)
+    if not frame.MarkerIcon then return end
+
+    local showMarker = plugin:GetSetting(1, "ShowMarkerIcon")
+    if showMarker == false then
+        frame.MarkerIcon:Hide()
+        return
+    end
+
+    local unit = frame.unit
+    if not UnitExists(unit) then
+        frame.MarkerIcon:Hide()
+        return
+    end
+
+    local index = GetRaidTargetIndex(unit)
+    
+    -- Helper to set sprite sheet cell and property
+    local function SetMarkerIndex(i)
+        if frame.MarkerIcon.SetSpriteSheetCell then
+             frame.MarkerIcon:SetSpriteSheetCell(i, RAID_TARGET_TEXTURE_ROWS, RAID_TARGET_TEXTURE_COLUMNS)
+             frame.MarkerIcon.orbitSpriteIndex = i -- Required for Canvas Mode
+        else
+            -- Fallback if mixin missing (shouldn't happen on textures created via proper methods, but good safety)
+            local col = (i - 1) % RAID_TARGET_TEXTURE_COLUMNS
+            local row = math.floor((i - 1) / RAID_TARGET_TEXTURE_COLUMNS)
+            local w = 1 / RAID_TARGET_TEXTURE_COLUMNS
+            local h = 1 / RAID_TARGET_TEXTURE_ROWS
+            frame.MarkerIcon:SetTexCoord(col * w, (col + 1) * w, row * h, (row + 1) * h)
+            frame.MarkerIcon.orbitSpriteIndex = i
+        end
+    end
+
+    if index then
+        SetMarkerIndex(index)
+        frame.MarkerIcon:Show()
+    else
+        frame.MarkerIcon:Hide()
+    end
+end
+
 -- Update all status indicators
 local function UpdateAllStatusIndicators(frame, plugin)
     UpdateRoleIcon(frame, plugin)
@@ -467,6 +514,7 @@ local function UpdateAllStatusIndicators(frame, plugin)
     UpdateReadyCheck(frame, plugin)
     UpdateIncomingRes(frame, plugin)
     UpdateIncomingSummon(frame, plugin)
+    UpdateMarkerIcon(frame, plugin)
 end
 
 -- [ PARTY FRAME CREATION ]--------------------------------------------------------------------------
@@ -601,7 +649,15 @@ local function CreatePartyFrame(partyIndex, plugin, unitOverride)
     frame.SummonIcon:SetSize(iconSize * 1.5, iconSize * 1.5)
     frame.SummonIcon:SetPoint("CENTER", frame, "CENTER", 0, 0)
     frame.SummonIcon:SetDrawLayer("OVERLAY", 7)
+    frame.SummonIcon:SetDrawLayer("OVERLAY", 7)
     frame.SummonIcon:Hide()
+
+    -- Marker Icon - Top Center (default)
+    frame.MarkerIcon = frame.StatusOverlay:CreateTexture(nil, "OVERLAY")
+    frame.MarkerIcon:SetSize(iconSize, iconSize)
+    frame.MarkerIcon:SetPoint("TOP", frame, "TOP", 0, -2)
+    frame.MarkerIcon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
+    frame.MarkerIcon:Hide()
 
     -- Register power events
     frame:RegisterUnitEvent("UNIT_POWER_UPDATE", unit)
@@ -623,7 +679,9 @@ local function CreatePartyFrame(partyIndex, plugin, unitOverride)
     frame:RegisterEvent("INCOMING_SUMMON_CHANGED")
     frame:RegisterEvent("PLAYER_ROLES_ASSIGNED")
     frame:RegisterEvent("GROUP_ROSTER_UPDATE")
+    frame:RegisterEvent("GROUP_ROSTER_UPDATE")
     frame:RegisterEvent("PLAYER_TARGET_CHANGED")
+    frame:RegisterEvent("RAID_TARGET_UPDATE")
 
     -- Update Loop
     frame:SetScript("OnShow", function(self)
@@ -693,10 +751,14 @@ local function CreatePartyFrame(partyIndex, plugin, unitOverride)
             return
         end
         
-        -- Role/Group updates
         if event == "PLAYER_ROLES_ASSIGNED" or event == "GROUP_ROSTER_UPDATE" then
             UpdateRoleIcon(f, plugin)
             UpdateLeaderIcon(f, plugin)
+            return
+        end
+
+        if event == "RAID_TARGET_UPDATE" then
+            UpdateMarkerIcon(f, plugin)
             return
         end
 
@@ -882,6 +944,15 @@ function Plugin:AddSettings(dialog, systemFrame)
                     end
                 end,
             },
+            { type = "checkbox", key = "ShowMarkerIcon", label = "Show Marker Icon", default = true,
+                onChange = function(val)
+                    self:SetSetting(1, "ShowMarkerIcon", val)
+                    self:ApplySettings()
+                    if self.frames and self.frames[1] and self.frames[1].preview then
+                        self:SchedulePreviewUpdate()
+                    end
+                end,
+            },
             { type = "checkbox", key = "ShowPowerBar", label = "Show Power Bar", default = true,
                 onChange = function(val)
                     self:SetSetting(1, "ShowPowerBar", val)
@@ -1027,6 +1098,19 @@ function Plugin:OnLoad()
                 end
             })
         end
+
+        -- Register MarkerIcon for drag
+        if firstFrame.MarkerIcon then
+            OrbitEngine.ComponentDrag:Attach(firstFrame.MarkerIcon, self.container, {
+                key = "MarkerIcon",
+                onPositionChange = function(_, anchorX, anchorY, offsetX, offsetY)
+                    local positions = pluginRef:GetSetting(1, "ComponentPositions") or {}
+                    positions.MarkerIcon = { anchorX = anchorX, anchorY = anchorY, 
+                                             offsetX = offsetX, offsetY = offsetY }
+                    pluginRef:SetSetting(1, "ComponentPositions", positions)
+                end
+            })
+        end
     end
 
     -- Container is the selectable frame for Edit Mode
@@ -1153,6 +1237,23 @@ function Plugin:PrepareIconsForCanvasMode()
             frame.LeaderIcon:SetAtlas("UI-HUD-UnitFrame-Player-Group-LeaderIcon")
         end
         frame.LeaderIcon:SetSize(16, 16)
+    end
+
+    -- MarkerIcon uses sprite sheet, needs specific setup
+    if frame.MarkerIcon then
+        frame.MarkerIcon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
+        frame.MarkerIcon.orbitSpriteIndex = 8 -- Skull for preview
+        frame.MarkerIcon.orbitSpriteRows = 4
+        frame.MarkerIcon.orbitSpriteCols = 4
+        
+        -- Apply sprite sheet cell manually for preview
+        local i = 8
+        local col = (i - 1) % 4
+        local row = math.floor((i - 1) / 4)
+        local w = 1 / 4
+        local h = 1 / 4
+        frame.MarkerIcon:SetTexCoord(col * w, (col + 1) * w, row * h, (row + 1) * h)
+        frame.MarkerIcon:Show()
     end
 end
 
@@ -1329,7 +1430,7 @@ function Plugin:ApplySettings()
             end
 
             -- Apply positions for other status icons
-            local icons = { "RoleIcon", "LeaderIcon", "PhaseIcon", "ReadyCheckIcon", "ResIcon", "SummonIcon" }
+            local icons = { "RoleIcon", "LeaderIcon", "PhaseIcon", "ReadyCheckIcon", "ResIcon", "SummonIcon", "MarkerIcon" }
             for _, iconKey in ipairs(icons) do
                 if frame[iconKey] and savedPositions[iconKey] then
                     local pos = savedPositions[iconKey]

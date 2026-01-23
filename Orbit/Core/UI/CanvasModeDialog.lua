@@ -448,6 +448,25 @@ local function CreateDraggableComponent(preview, key, sourceComponent, startX, s
     -- Check for Frame with Icon child (used by BigDefensive, aura frames, etc.)
     local isIconFrame = sourceComponent and sourceComponent.Icon and sourceComponent.Icon.GetTexture
     
+
+    -- Helper to calculate and apply sprite sheet coords
+    local function ApplySpriteSheetCell(texture, index, rows, cols)
+        if not texture or not index then return end
+        rows = rows or 4
+        cols = cols or 4
+        
+        local col = (index - 1) % cols
+        local row = math.floor((index - 1) / cols)
+        local width = 1 / cols
+        local height = 1 / rows
+        local left = col * width
+        local right = left + width
+        local top = row * height
+        local bottom = top + height
+        
+        texture:SetTexCoord(left, right, top, bottom)
+    end
+
     if isFontString then
         -- Clone FontString
         visual = container:CreateFontString(nil, "OVERLAY")
@@ -493,7 +512,7 @@ local function CreateDraggableComponent(preview, key, sourceComponent, startX, s
         if ok2 and h and type(h) == "number" and (not issecretvalue or not issecretvalue(h)) then
             textHeight = h + 6
         end
-        container:SetSize(math.max(50, textWidth), math.max(18, textHeight))
+        container:SetSize(math.max(20, textWidth), math.max(18, textHeight))
         
         -- Center visual in container (matches how real components are anchored)
         visual:SetPoint("CENTER", container, "CENTER", 0, 0)
@@ -515,10 +534,20 @@ local function CreateDraggableComponent(preview, key, sourceComponent, startX, s
                 visual:SetTexture(texturePath)
             end
             
-            -- Copy texture coords if set (only for non-atlas)
-            local ok, l, r, t, b = pcall(function() return sourceComponent:GetTexCoord() end)
-            if ok and l then
-                visual:SetTexCoord(l, r, t, b)
+            -- Check for sprite sheet textures (e.g., MarkerIcon using SetSpriteSheetCell)
+            -- orbitSpriteIndex is stored by the component when setting the sprite cell
+            if sourceComponent.orbitSpriteIndex then
+                local spriteIndex = sourceComponent.orbitSpriteIndex
+                -- Use standard raid target icon dimensions (4x4 grid)
+                local rows = sourceComponent.orbitSpriteRows or 4
+                local cols = sourceComponent.orbitSpriteCols or 4
+                ApplySpriteSheetCell(visual, spriteIndex, rows, cols)
+            else
+                -- Copy texture coords if set (only for non-atlas, non-sprite-sheet)
+                local ok, l, r, t, b = pcall(function() return sourceComponent:GetTexCoord() end)
+                if ok and l then
+                    visual:SetTexCoord(l, r, t, b)
+                end
             end
         end
         
@@ -800,10 +829,8 @@ local function CreateDraggableComponent(preview, key, sourceComponent, startX, s
             self:ClearAllPoints()
             self:SetPoint("CENTER", preview, "CENTER", centerRelX, centerRelY)
             
-            -- Update text alignment in preview
-            if self.visual and self.isFontString then
-                ApplyTextAlignment(self, self.visual, justifyH)
-            end
+            -- NOTE: Don't update text alignment during drag - keeps movement smooth
+            -- JustifyH is calculated and stored for save, but visual stays centered
             
             -- Store current values for OnDragStop
             self.anchorX = anchorX
@@ -847,6 +874,11 @@ local function CreateDraggableComponent(preview, key, sourceComponent, startX, s
         -- Position by CENTER (consistent with OnUpdate)
         self:ClearAllPoints()
         self:SetPoint("CENTER", preview, "CENTER", snappedX, snappedY)
+        
+        -- Now apply text alignment for final preview appearance
+        if self.visual and self.isFontString then
+            ApplyTextAlignment(self, self.visual, self.justifyH or "CENTER")
+        end
     end)
     
     -- Hover effects + nudge tracking
@@ -861,6 +893,11 @@ local function CreateDraggableComponent(preview, key, sourceComponent, startX, s
             Dialog.hoveredComponent = nil
         end
     end)
+    
+    -- Apply existing overrides (Scale, Font, Shadow, etc.) to the visual immediately
+    if container.existingOverrides and OrbitEngine.CanvasComponentSettings and OrbitEngine.CanvasComponentSettings.ApplyAll then
+        OrbitEngine.CanvasComponentSettings:ApplyAll(container, container.existingOverrides)
+    end
     
     return container
 end

@@ -31,7 +31,11 @@ local function OnDragUpdate(selectionOverlay, elapsed)
         nil -- No locked-frame filter needed
     )
 
-    if anchorTarget and anchorEdge and anchorTarget ~= selectionOverlay.lastAnchorTarget then
+    -- Only show anchor lines for Orbit frames (not Blizzard Edit Mode frames)
+    -- Blizzard frames can be snapped to but not anchored to, so don't show anchor line
+    local isOrbitFrame = Selection.selections[anchorTarget] ~= nil
+
+    if anchorTarget and anchorEdge and isOrbitFrame and anchorTarget ~= selectionOverlay.lastAnchorTarget then
         -- Clear previous
         if selectionOverlay.lastAnchorTarget then
             local oldSel = Selection.selections[selectionOverlay.lastAnchorTarget]
@@ -127,7 +131,11 @@ function Drag:OnDragStop(selectionOverlay)
         anchoringEnabled = false
     end
 
-    if anchorTarget and anchorEdge and anchoringEnabled then
+    -- Only allow anchoring to Orbit frames (in Selection.selections registry)
+    -- Blizzard Edit Mode frames can be used for snapping but not for persistent anchors
+    local isOrbitFrame = Selection.selections[anchorTarget] ~= nil
+
+    if anchorTarget and anchorEdge and anchoringEnabled and isOrbitFrame then
         local padding = nil
         local name = parent:GetName()
         local partnerName = Selection:GetSymmetricPartner(name)

@@ -268,6 +268,23 @@ function Dialog:Open(componentKey, container, plugin, systemIndex)
     local yOffset = 0
     local widgetIndex = 0
     
+    -- Helper to get current value from visual if no override exists
+    local function GetValueFromVisual(container, key)
+        if not container or not container.visual then return nil end
+        local visual = container.visual
+        
+        if key == "FontSize" and visual.GetFont then
+            local _, size = visual:GetFont()
+            return size and math.floor(size + 0.5)
+        elseif key == "ShowShadow" and visual.GetShadowOffset then
+            local x, y = visual:GetShadowOffset()
+            return (x and x > 0) or (x and x < 0)  -- true if any offset
+        elseif key == "Scale" then
+            return 1.0  -- Default scale
+        end
+        return nil
+    end
+
     for _, control in ipairs(schema.controls) do
         widgetIndex = widgetIndex + 1
         local widget = nil
@@ -280,6 +297,11 @@ function Dialog:Open(componentKey, container, plugin, systemIndex)
             if compDefaults then
                 currentValue = compDefaults[control.key]
             end
+        end
+        
+        -- Fallback to reading from visual or sane defaults
+        if currentValue == nil then
+            currentValue = GetValueFromVisual(container, control.key)
         end
         
         local callback = function(key, value)
@@ -336,19 +358,19 @@ function Dialog:OnValueChanged(key, value)
     -- Store on container for Apply to pick up
     if self.container then
         self.container.pendingOverrides = self.currentOverrides
+        
+        -- Apply preview immediately
+        self:ApplyStyle(self.container, key, value)
     end
-    
-    -- Apply preview immediately if possible
-    self:PreviewChange(key, value)
 end
 
-function Dialog:PreviewChange(key, value)
-    local container = self.container
+-- Apply a single style setting to a component container
+function Dialog:ApplyStyle(container, key, value)
     if not container or not container.visual then return end
     
     local visual = container.visual
     
-    -- Apply preview based on key
+    -- Apply style based on key
     if key == "FontSize" and visual.SetFont then
         local font, _, flags = visual:GetFont()
         visual:SetFont(font, value, flags)
@@ -383,6 +405,15 @@ function Dialog:PreviewChange(key, value)
         elseif visual.SetScale then
             visual:SetScale(value)
         end
+    end
+end
+
+-- Apply a table of overrides to a component container
+function Dialog:ApplyAll(container, overrides)
+    if not container or not overrides then return end
+    
+    for key, value in pairs(overrides) do
+        self:ApplyStyle(container, key, value)
     end
 end
 
