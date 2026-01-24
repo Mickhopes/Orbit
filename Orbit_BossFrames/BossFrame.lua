@@ -27,11 +27,24 @@ local Plugin = Orbit:RegisterPlugin("Boss Frames", SYSTEM_ID, {
         CastBarWidth = 140,
         CastBarIcon = true,
         ReactionColour = true, -- Enable reaction color by default
+        -- Disabled components (Canvas Mode drag-to-disable)
+        DisabledComponents = {},
     },
 }, Orbit.Constants.PluginGroups.BossFrames)
 
 -- Mixin Preview Logic
 Mixin(Plugin, Orbit.BossFramePreviewMixin, Orbit.AuraMixin)
+
+-- Check if a component is disabled (Canvas Mode drag-to-disable)
+function Plugin:IsComponentDisabled(componentKey)
+    local disabled = self:GetSetting(1, "DisabledComponents") or {}
+    for _, key in ipairs(disabled) do
+        if key == componentKey then
+            return true
+        end
+    end
+    return false
+end
 
 -- Helper to get global settings from Player Frame
 function Plugin:GetPlayerSetting(key)

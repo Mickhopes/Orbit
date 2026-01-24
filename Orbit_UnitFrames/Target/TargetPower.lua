@@ -40,11 +40,11 @@ local SYSTEM_ID = "Orbit_TargetPower"
 local SYSTEM_INDEX = 1
 
 local Plugin = Orbit:RegisterPlugin("Target Power", SYSTEM_ID, {
+    canvasMode = true,  -- Enable Canvas Mode for component editing
     defaults = {
         Hidden = false,
         Width = 200,
         Height = 15,
-        ShowText = false,
         ShowPercent = false,
         TextSize = 12,
         TextAlignment = "CENTER",
@@ -82,40 +82,7 @@ function Plugin:AddSettings(dialog, systemFrame)
     -- Height
     WL:AddSizeSettings(self, schema, systemIndex, systemFrame, nil, { min = 5, max = 50, default = 15 }, nil)
 
-    -- Show Text (Manual add to omit Size slider)
-    table.insert(schema.controls, {
-        type = "checkbox",
-        key = "ShowText",
-        label = "Show Text",
-        default = false,
-        onChange = function(val)
-            self:SetSetting(systemIndex, "ShowText", val)
-            self:ApplySettings()
-            -- Re-render to show/hide alignment dropdown
-            OrbitEngine.Layout:Reset(dialog)
-            self:AddSettings(dialog, systemFrame)
-        end,
-    })
-
-    -- Text Alignment (only shown when ShowText is enabled)
-    local showText = self:GetSetting(systemIndex, "ShowText")
-    if showText then
-        table.insert(schema.controls, {
-            type = "dropdown",
-            key = "TextAlignment",
-            label = "Text Position",
-            options = {
-                { text = "Left", value = "LEFT" },
-                { text = "Center", value = "CENTER" },
-                { text = "Right", value = "RIGHT" },
-            },
-            default = "CENTER",
-            onChange = function(val)
-                self:SetSetting(systemIndex, "TextAlignment", val)
-                self:ApplySettings()
-            end,
-        })
-    end
+    -- Note: Show Text is now controlled via Canvas Mode (drag Text to disabled dock)
 
     Orbit.Config:Render(dialog, systemFrame, self, schema)
 end
@@ -140,6 +107,7 @@ function Plugin:OnLoad()
 
     -- Alias
     Frame.PowerBar = PowerBar
+    self.frame = Frame  -- Expose for PluginMixin compatibility
 
     self:ApplySettings()
 
@@ -172,6 +140,18 @@ function Plugin:OnLoad()
         OrbitEngine.EditMode:RegisterExitCallback(function()
             self:ApplySettings()
         end, self)
+    end
+
+    -- Canvas Mode: Register draggable components
+    if OrbitEngine.ComponentDrag and Frame.Text then
+        OrbitEngine.ComponentDrag:Attach(Frame.Text, Frame, {
+            key = "Text",
+            onPositionChange = function(component, anchorX, anchorY, offsetX, offsetY, justifyH)
+                local positions = self:GetSetting(SYSTEM_INDEX, "ComponentPositions") or {}
+                positions.Text = { anchorX = anchorX, anchorY = anchorY, offsetX = offsetX, offsetY = offsetY, justifyH = justifyH }
+                self:SetSetting(SYSTEM_INDEX, "ComponentPositions", positions)
+            end
+        })
     end
 
     self:UpdateVisibility()
@@ -241,7 +221,6 @@ function Plugin:ApplySettings()
     local height = self:GetSetting(systemIndex, "Height")
     local borderSize = self:GetSetting(systemIndex, "BorderSize")
     local textureName = self:GetSetting(systemIndex, "Texture")
-    local showText = self:GetSetting(systemIndex, "ShowText")
     local textSize = Orbit.Skin:GetAdaptiveTextSize(height, 12, 18, 1)
     local fontName = self:GetSetting(systemIndex, "Font")
 
@@ -268,33 +247,27 @@ function Plugin:ApplySettings()
         Frame.bg:SetColorTexture(c.r, c.g, c.b, c.a or 0.9)
     end
 
-    -- Text
-    if showText then
+    -- Text (controlled via Canvas Mode)
+    if OrbitEngine.ComponentDrag:IsDisabled(Frame.Text) then
+        Frame.Text:Hide()
+    else
         Frame.Text:Show()
         local fontPath = LSM:Fetch("font", fontName)
         Frame.Text:SetFont(fontPath, textSize, "OUTLINE")
 
-        local alignment = self:GetSetting(systemIndex, "TextAlignment") or "CENTER"
-        local padding = Orbit.Constants.UnitFrame.TextPadding
-
         Frame.Text:ClearAllPoints()
-        if alignment == "LEFT" then
-            Frame.Text:SetPoint("LEFT", Frame.Overlay, "LEFT", padding, 0)
-            Frame.Text:SetJustifyH("LEFT")
-        elseif alignment == "RIGHT" then
-            Frame.Text:SetPoint("RIGHT", Frame.Overlay, "RIGHT", -padding, 0)
-            Frame.Text:SetJustifyH("RIGHT")
-        else
-            -- Center (default)
-            Frame.Text:SetPoint("CENTER", Frame.Overlay, "CENTER", 0, 0)
-            Frame.Text:SetJustifyH("CENTER")
-        end
-    else
-        Frame.Text:Hide()
+        Frame.Text:SetPoint("CENTER", Frame.Overlay, "CENTER", 0, 0)
+        Frame.Text:SetJustifyH("CENTER")
     end
 
     -- Restore Position
     OrbitEngine.Frame:RestorePosition(Frame, self, systemIndex)
+
+    -- Restore Component Positions (Canvas Mode)
+    local savedPositions = self:GetSetting(systemIndex, "ComponentPositions")
+    if savedPositions and OrbitEngine.ComponentDrag then
+        OrbitEngine.ComponentDrag:RestoreFramePositions(Frame, savedPositions)
+    end
 
     if OrbitEngine.Frame.ForceUpdateSelection then
         OrbitEngine.Frame:ForceUpdateSelection(Frame)

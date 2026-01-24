@@ -52,6 +52,20 @@ function Orbit.PluginMixin:RegisterStandardEvents()
     end
 end
 
+-- [ CANVAS MODE HELPERS ]--------------------------------------------------------------------------
+-- Check if a component is disabled via Canvas Mode drag-to-disable feature
+-- Components are stored in plugin's DisabledComponents setting array
+function Orbit.PluginMixin:IsComponentDisabled(componentKey)
+    local systemIndex = self.frame and self.frame.systemIndex or 1
+    local disabled = self:GetSetting(systemIndex, "DisabledComponents") or {}
+    for _, key in ipairs(disabled) do
+        if key == componentKey then
+            return true
+        end
+    end
+    return false
+end
+
 -- Persistence Helpers
 
 -- Returns fixed layout key for storing Orbit settings

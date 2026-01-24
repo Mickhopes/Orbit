@@ -33,6 +33,27 @@ local PREVIEW_DEFAULTS = {
     PowerPercents = { 85, 60, 40, 15, 80 },
     Names = { "Healbot", "Tankenstein", "Stabby", "Pyromancer", "You" },
     Classes = { "PRIEST", "WARRIOR", "ROGUE", "MAGE", "PALADIN" },
+    AuraSpacing = 2,
+    FakeCooldownElapsed = 10,   -- Seconds already elapsed on fake cooldown
+    FakeCooldownDuration = 60,  -- Total fake cooldown duration
+}
+
+-- Sample debuff icons for preview (harmful auras)
+local SAMPLE_DEBUFF_ICONS = {
+    136096, -- Moonfire
+    136118, -- Corruption
+    132158, -- Nature's Grasp (Roots)
+    136048, -- Insect Swarm
+    132212, -- Faerie Fire
+}
+
+-- Sample buff icons for preview (helpful auras from player)
+local SAMPLE_BUFF_ICONS = {
+    135907, -- Rejuvenation
+    136048, -- Regrowth
+    136041, -- Power Word: Shield
+    135944, -- Renew
+    135987, -- Earth Shield
 }
 
 -- [ PREVIEW LOGIC ]---------------------------------------------------------------------------------
@@ -261,10 +282,11 @@ function Orbit.PartyFramePreviewMixin:ApplyPreviewVisuals()
             if isCanvasMode then
                 local iconSize = 24  -- Size for visibility
                 local spacing = 28   -- Spacing between icons
+                local previewAtlases = Orbit.IconPreviewAtlases or {}
                 
                 -- Phase Icon - show with mock atlas (offset left)
                 if frame.PhaseIcon then
-                    frame.PhaseIcon:SetAtlas("RaidFrame-Icon-Phasing")
+                    frame.PhaseIcon:SetAtlas(previewAtlases.PhaseIcon or "RaidFrame-Icon-Phasing")
                     frame.PhaseIcon:SetSize(iconSize, iconSize)
                     -- Only set default position if no saved position exists
                     local savedPositions = self:GetSetting(1, "ComponentPositions")
@@ -276,7 +298,7 @@ function Orbit.PartyFramePreviewMixin:ApplyPreviewVisuals()
                 end
                 -- Ready Check Icon - show with mock atlas (offset left-center)
                 if frame.ReadyCheckIcon then
-                    frame.ReadyCheckIcon:SetAtlas("UI-HUD-Minimap-Tracking-Question")
+                    frame.ReadyCheckIcon:SetAtlas(previewAtlases.ReadyCheckIcon or "UI-LFG-ReadyMark-Raid")
                     frame.ReadyCheckIcon:SetSize(iconSize, iconSize)
                     local savedPositions = self:GetSetting(1, "ComponentPositions")
                     if not savedPositions or not savedPositions.ReadyCheckIcon then
@@ -287,7 +309,7 @@ function Orbit.PartyFramePreviewMixin:ApplyPreviewVisuals()
                 end
                 -- Incoming Res Icon - show with mock atlas (offset right-center)
                 if frame.ResIcon then
-                    frame.ResIcon:SetAtlas("RaidFrame-Icon-Rez")
+                    frame.ResIcon:SetAtlas(previewAtlases.ResIcon or "RaidFrame-Icon-Rez")
                     frame.ResIcon:SetSize(iconSize, iconSize)
                     local savedPositions = self:GetSetting(1, "ComponentPositions")
                     if not savedPositions or not savedPositions.ResIcon then
@@ -298,7 +320,7 @@ function Orbit.PartyFramePreviewMixin:ApplyPreviewVisuals()
                 end
                 -- Incoming Summon Icon - show with mock atlas (offset right)
                 if frame.SummonIcon then
-                    frame.SummonIcon:SetAtlas("RaidFrame-Icon-SummonPending")
+                    frame.SummonIcon:SetAtlas(previewAtlases.SummonIcon or "RaidFrame-Icon-SummonPending")
                     frame.SummonIcon:SetSize(iconSize, iconSize)
                     local savedPositions = self:GetSetting(1, "ComponentPositions")
                     if not savedPositions or not savedPositions.SummonIcon then
@@ -314,7 +336,181 @@ function Orbit.PartyFramePreviewMixin:ApplyPreviewVisuals()
                 if frame.ResIcon then frame.ResIcon:Hide() end
                 if frame.SummonIcon then frame.SummonIcon:Hide() end
             end
+            
+            -- Hide real aura pools before showing preview auras
+            if frame.debuffPool then
+                frame.debuffPool:ReleaseAll()
+            end
+            if frame.buffPool then
+                frame.buffPool:ReleaseAll()
+            end
+            
+            -- Show preview auras (debuffs and buffs)
+            self:ShowPreviewAuras(frame, i)
         end
+    end
+end
+
+-- Show preview debuffs and buffs on a frame
+function Orbit.PartyFramePreviewMixin:ShowPreviewAuras(frame, frameIndex)
+    local orientation = self:GetSetting(1, "Orientation") or 0
+    local maxDebuffs = self:GetSetting(1, "MaxDebuffs") or 3
+    local maxBuffs = self:GetSetting(1, "MaxBuffs") or 3
+    
+    -- Get orientation-specific position settings
+    local debuffKey = orientation == 0 and "DebuffPositionVertical" or "DebuffPositionHorizontal"
+    local buffKey = orientation == 0 and "BuffPositionVertical" or "BuffPositionHorizontal"
+    local debuffPosition = self:GetSetting(1, debuffKey) or (orientation == 0 and "Right" or "Above")
+    local buffPosition = self:GetSetting(1, buffKey) or (orientation == 0 and "Left" or "Below")
+    
+    -- Vary the number of icons shown per frame for variety
+    local debuffCounts = { 2, 3, 1, 2, 0 }
+    local buffCounts = { 3, 1, 2, 1, 0 }
+    local numDebuffs = math.min(debuffCounts[frameIndex] or 2, maxDebuffs)
+    local numBuffs = math.min(buffCounts[frameIndex] or 1, maxBuffs)
+    
+    -- Show debuffs
+    self:ShowPreviewAuraIcons(frame, "debuff", debuffPosition, numDebuffs, maxDebuffs, SAMPLE_DEBUFF_ICONS)
+    
+    -- Show buffs
+    self:ShowPreviewAuraIcons(frame, "buff", buffPosition, numBuffs, maxBuffs, SAMPLE_BUFF_ICONS)
+end
+
+-- Helper to show preview aura icons (debuffs or buffs)
+function Orbit.PartyFramePreviewMixin:ShowPreviewAuraIcons(frame, auraType, position, numIcons, maxIcons, sampleIcons)
+    local containerKey = auraType .. "Container"
+    local poolKey = "preview" .. auraType:gsub("^%l", string.upper) .. "s"
+    
+    -- Handle disabled position
+    if position == "Disabled" then
+        if frame[containerKey] then
+            frame[containerKey]:Hide()
+        end
+        return
+    end
+    
+    if numIcons == 0 then
+        if frame[containerKey] then
+            frame[containerKey]:Hide()
+        end
+        return
+    end
+    
+    -- Ensure container exists
+    if not frame[containerKey] then
+        frame[containerKey] = CreateFrame("Frame", nil, frame)
+    end
+    
+    local container = frame[containerKey]
+    container:SetParent(frame)
+    container:SetFrameStrata("MEDIUM")
+    container:SetFrameLevel(frame:GetFrameLevel() + 5)
+    container:Show()
+    
+    -- Calculate layout
+    local frameWidth = frame:GetWidth()
+    local frameHeight = frame:GetHeight()
+    local isHorizontal = (position == "Above" or position == "Below")
+    local spacing = PREVIEW_DEFAULTS.AuraSpacing
+    
+    -- Calculate icon size based on position
+    local iconSize
+    if isHorizontal then
+        iconSize = (frameWidth - (maxIcons - 1) * spacing) / maxIcons
+        iconSize = math.max(12, iconSize)
+    else
+        iconSize = frameHeight
+        iconSize = math.max(12, iconSize)
+    end
+    
+    -- Calculate container size
+    local containerWidth, containerHeight
+    if isHorizontal then
+        containerWidth = (numIcons * iconSize) + ((numIcons - 1) * spacing)
+        containerHeight = iconSize
+    else
+        containerWidth = (numIcons * iconSize) + ((numIcons - 1) * spacing)
+        containerHeight = iconSize
+    end
+    
+    container:SetSize(containerWidth, containerHeight)
+    
+    -- Position container
+    container:ClearAllPoints()
+    if position == "Above" then
+        container:SetPoint("BOTTOMLEFT", frame, "TOPLEFT", 0, 2)
+    elseif position == "Below" then
+        container:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", 0, -2)
+    elseif position == "Left" then
+        container:SetPoint("TOPRIGHT", frame, "TOPLEFT", -2, 0)
+    elseif position == "Right" then
+        container:SetPoint("TOPLEFT", frame, "TOPRIGHT", 2, 0)
+    end
+    
+    -- Create preview icons array if needed
+    if not frame[poolKey] then
+        frame[poolKey] = {}
+    end
+    
+    -- Hide existing preview icons
+    for _, icon in ipairs(frame[poolKey]) do
+        icon:Hide()
+    end
+    
+    -- Skin settings
+    local globalBorder = (self.GetPlayerSetting and self:GetPlayerSetting("BorderSize")) or 1
+    local skinSettings = {
+        zoom = 0,
+        borderStyle = 1,
+        borderSize = globalBorder,
+        showTimer = true,
+    }
+    
+    -- Create and position icons
+    for i = 1, numIcons do
+        local icon = frame[poolKey][i]
+        if not icon then
+            icon = CreateFrame("Button", nil, container, "BackdropTemplate")
+            icon.Icon = icon:CreateTexture(nil, "ARTWORK")
+            icon.Icon:SetAllPoints()
+            icon.icon = icon.Icon
+            
+            icon.Cooldown = CreateFrame("Cooldown", nil, icon, "CooldownFrameTemplate")
+            icon.Cooldown:SetAllPoints()
+            icon.Cooldown:SetHideCountdownNumbers(false)
+            icon.cooldown = icon.Cooldown
+            
+            frame[poolKey][i] = icon
+        end
+        
+        icon:SetParent(container)
+        icon:SetSize(iconSize, iconSize)
+        
+        -- Position icon
+        icon:ClearAllPoints()
+        local xOffset = (i - 1) * (iconSize + spacing)
+        if position == "Left" then
+            -- Grow right-to-left (away from center)
+            icon:SetPoint("TOPRIGHT", container, "TOPRIGHT", -xOffset, 0)
+        else
+            -- Grow left-to-right
+            icon:SetPoint("TOPLEFT", container, "TOPLEFT", xOffset, 0)
+        end
+        
+        -- Set texture (cycle through sample icons)
+        local iconIndex = ((i - 1) % #sampleIcons) + 1
+        icon.Icon:SetTexture(sampleIcons[iconIndex])
+        
+        -- Apply skin
+        if Orbit.Skin and Orbit.Skin.Icons then
+            Orbit.Skin.Icons:ApplyCustom(icon, skinSettings)
+        end
+        
+        -- Fake cooldown
+        icon.Cooldown:SetCooldown(GetTime() - PREVIEW_DEFAULTS.FakeCooldownElapsed, PREVIEW_DEFAULTS.FakeCooldownDuration)
+        icon.Cooldown:Show()
+        
+        icon:Show()
     end
 end
 
@@ -363,6 +559,22 @@ function Orbit.PartyFramePreviewMixin:HidePreview()
 
         -- Restore UnitWatch for normal gameplay
         SafeRegisterUnitWatch(frame)
+        
+        -- Hide and clear preview debuffs
+        if frame.previewDebuffs then
+            for _, icon in ipairs(frame.previewDebuffs) do
+                icon:Hide()
+            end
+            wipe(frame.previewDebuffs)
+        end
+        
+        -- Hide and clear preview buffs
+        if frame.previewBuffs then
+            for _, icon in ipairs(frame.previewBuffs) do
+                icon:Hide()
+            end
+            wipe(frame.previewBuffs)
+        end
 
         -- Force refresh with real unit data (replaces preview values)
         if frame.UpdateAll then
@@ -371,7 +583,7 @@ function Orbit.PartyFramePreviewMixin:HidePreview()
         
     end
     
-    -- Reassign units based on current IncludePlayer and SortByRole settings
+    -- Reassign units based on current IncludePlayer setting (always sorted by role)
     if self.UpdateFrameUnits then
         self:UpdateFrameUnits()
     end

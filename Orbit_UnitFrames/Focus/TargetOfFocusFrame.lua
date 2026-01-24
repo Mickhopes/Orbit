@@ -9,6 +9,7 @@ local TOF_FRAME_INDEX = 101 -- Custom index for Orbit-only frames
 local FOCUS_FRAME_INDEX = (Enum.EditModeUnitFrameSystemIndices and Enum.EditModeUnitFrameSystemIndices.Focus) or 3
 
 local Plugin = Orbit:RegisterPlugin("Target of Focus", SYSTEM_ID, {
+    canvasMode = true,  -- Enable Canvas Mode for component editing
     defaults = {
         Width = 100,
         Height = 20,
@@ -72,6 +73,30 @@ function Plugin:OnLoad()
     -- Attach to Orbit Frame system
     OrbitEngine.Frame:AttachSettingsListener(self.frame, self, TOF_FRAME_INDEX)
 
+    -- Canvas Mode: Register draggable components
+    if OrbitEngine.ComponentDrag and self.frame.Name then
+        OrbitEngine.ComponentDrag:Attach(self.frame.Name, self.frame, {
+            key = "Name",
+            onPositionChange = function(component, anchorX, anchorY, offsetX, offsetY, justifyH)
+                local positions = self:GetSetting(TOF_FRAME_INDEX, "ComponentPositions") or {}
+                positions.Name = { anchorX = anchorX, anchorY = anchorY, offsetX = offsetX, offsetY = offsetY, justifyH = justifyH }
+                self:SetSetting(TOF_FRAME_INDEX, "ComponentPositions", positions)
+            end
+        })
+    end
+
+    -- Attach HealthText for drag in Canvas Mode
+    if self.frame.HealthText then
+        OrbitEngine.ComponentDrag:Attach(self.frame.HealthText, self.frame, {
+            key = "HealthText",
+            onPositionChange = function(component, anchorX, anchorY, offsetX, offsetY, justifyH)
+                local positions = self:GetSetting(TOF_FRAME_INDEX, "ComponentPositions") or {}
+                positions.HealthText = { anchorX = anchorX, anchorY = anchorY, offsetX = offsetX, offsetY = offsetY, justifyH = justifyH }
+                self:SetSetting(TOF_FRAME_INDEX, "ComponentPositions", positions)
+            end
+        })
+    end
+
     local plugin = self
     local originalOnEvent = self.frame:GetScript("OnEvent")
     self.frame:SetScript("OnEvent", function(f, event, unit, ...)
@@ -79,6 +104,14 @@ function Plugin:OnLoad()
             -- Only update if enabled (or in Edit Mode AND enabled)
             if plugin:IsEnabled() then
                 f:UpdateAll()
+            end
+            return
+        end
+        -- Handle UNIT_HEALTH: skip comparisons, just update (UnitHealth API handles focustarget correctly)
+        if event == "UNIT_HEALTH" or event == "UNIT_MAXHEALTH" then
+            if UnitExists("focustarget") then
+                f:UpdateHealth()
+                f:UpdateHealthText()
             end
             return
         end
@@ -201,10 +234,18 @@ function Plugin:ApplySettings(frame)
         frame.Name:SetShadowOffset(1, -1)
     end
 
-    -- Disable Health Text (too small for this frame)
-    frame.healthTextEnabled = false
-    if frame.HealthText then
-        frame.HealthText:Hide()
+    -- Check if HealthText is disabled in Canvas Mode
+    if self:IsComponentDisabled("HealthText") then
+        frame.healthTextEnabled = false
+        if frame.HealthText then
+            frame.HealthText:Hide()
+        end
+    else
+        frame.healthTextEnabled = true
+        if frame.HealthText then
+            frame.HealthText:Show()
+            frame:UpdateHealthText()
+        end
     end
 
     -- Stub UpdateTextLayout to prevent it from overriding centered name
@@ -226,6 +267,12 @@ function Plugin:ApplySettings(frame)
     -- Update frame
     if enabled then
         frame:UpdateAll()
+    end
+
+    -- Restore Component Positions (Canvas Mode)
+    local savedPositions = self:GetSetting(systemIndex, "ComponentPositions")
+    if savedPositions and OrbitEngine.ComponentDrag then
+        OrbitEngine.ComponentDrag:RestoreFramePositions(frame, savedPositions)
     end
 end
 

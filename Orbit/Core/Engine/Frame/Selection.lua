@@ -344,7 +344,9 @@ function Selection:OnEditModeEnter()
         end
         for frame, selection in pairs(Selection.selections) do
             Selection:UpdateVisuals(frame, selection)
-            frame:SetMovable(true)
+            if not frame.disableMovement then
+                frame:SetMovable(true)
+            end
         end
         
         -- Force refresh to apply native visibility settings immediately

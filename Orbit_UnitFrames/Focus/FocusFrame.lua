@@ -21,6 +21,8 @@ local Plugin = Orbit:RegisterPlugin("Focus Frame", SYSTEM_ID, {
         ShowElite = true,
         Width = 160,
         Height = 40,
+        -- Disabled components (Canvas Mode drag-to-disable)
+        DisabledComponents = {},
         -- Default component positions (Canvas Mode is single source of truth)
         ComponentPositions = {
             Name = { anchorX = "LEFT", offsetX = 5, anchorY = "CENTER", offsetY = 0, justifyH = "LEFT" },
@@ -42,27 +44,8 @@ function Plugin:AddSettings(dialog, systemFrame)
 
     local schema = {
         hideNativeSettings = true,
+        -- Note: ShowLevel and ShowElite removed - use Canvas Mode for component visibility
         controls = {
-            {
-                type = "checkbox",
-                key = "ShowLevel",
-                label = "Show Level",
-                default = true,
-                onChange = function(val)
-                    self:SetSetting(FOCUS_FRAME_INDEX, "ShowLevel", val)
-                    self:UpdateVisualsExtended(self.frame, FOCUS_FRAME_INDEX)
-                end,
-            },
-            {
-                type = "checkbox",
-                key = "ShowElite",
-                label = "Show Elite Icon",
-                default = true,
-                onChange = function(val)
-                    self:SetSetting(FOCUS_FRAME_INDEX, "ShowElite", val)
-                    self:UpdateVisualsExtended(self.frame, FOCUS_FRAME_INDEX)
-                end,
-            },
             {
                 type = "checkbox",
                 key = "EnableFocusTarget",
@@ -157,6 +140,17 @@ end
 -- [ LIFECYCLE ]-------------------------------------------------------------------------------------
 function Plugin:OnLoad()
     Mixin(self, Orbit.UnitFrameMixin, Orbit.VisualsExtendedMixin)
+    
+    -- Check if a component is disabled (Canvas Mode drag-to-disable)
+    function Plugin:IsComponentDisabled(componentKey)
+        local disabled = self:GetSetting(FOCUS_FRAME_INDEX, "DisabledComponents") or {}
+        for _, key in ipairs(disabled) do
+            if key == componentKey then
+                return true
+            end
+        end
+        return false
+    end
 
     local hiddenParent = CreateFrame("Frame", "OrbitHiddenFocusParent", UIParent)
     hiddenParent:Hide()

@@ -70,7 +70,7 @@ function Drag:OnDragStart(selectionOverlay)
         return
     end
 
-    if parent:IsMovable() then
+    if parent:IsMovable() and not parent.orbitNoDrag then
         parent:StartMoving()
         parent.orbitIsDragging = true
 

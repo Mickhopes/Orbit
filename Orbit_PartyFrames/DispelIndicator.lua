@@ -4,7 +4,7 @@ local LCG = LibStub("LibCustomGlow-1.0")
 
 -- Dispel Indicator System for Party Frames
 -- Shows animated pixel border when unit has dispellable debuff
--- Uses Blizzard's CompactUnitFrame hooks to detect dispellable debuffs (same as DandersFrames)
+-- Uses Blizzard's CompactUnitFrame hooks to detect dispellable debuffs
 
 Orbit.PartyFrameDispelMixin = {}
 

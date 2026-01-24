@@ -18,16 +18,12 @@ function Mixin:UpdateLevelDisplay(frame, systemIndex)
         frame.LevelText:Hide()
         return
     end
-
-    local showLevel = self:GetSetting(systemIndex, "ShowLevel")
-    -- Handle legacy string or new boolean
-    if not showLevel or showLevel == "Hide" or showLevel == false then
+    
+    -- Check if disabled via Canvas Mode (sole source of truth for visibility)
+    if self.IsComponentDisabled and self:IsComponentDisabled("LevelText") then
         frame.LevelText:Hide()
         return
     end
-
-    -- Visibility only - positioning handled by ApplyComponentPositions via Canvas Mode
-    -- No more SetPoint calls here
 
     local level = UnitLevel(frame.unit)
 
@@ -70,10 +66,9 @@ function Mixin:UpdateClassificationVisuals(frame, systemIndex)
     if not frame then
         return
     end
-
-    local showElite = self:GetSetting(systemIndex, "ShowElite")
-    -- Handle legacy boolean or new string
-    if showElite == false or showElite == "Hide" then
+    
+    -- Check if disabled via Canvas Mode (sole source of truth for visibility)
+    if self.IsComponentDisabled and self:IsComponentDisabled("RareEliteIcon") then
         if frame.RareEliteIcon then
             frame.RareEliteIcon:Hide()
         end

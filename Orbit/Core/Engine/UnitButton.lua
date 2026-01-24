@@ -250,6 +250,14 @@ function UnitButtonMixin:UpdateHealthText()
     if not self.HealthText then
         return
     end
+    
+    -- Check if component is disabled via plugin (Canvas Mode drag-to-disable)
+    if self.orbitPlugin and self.orbitPlugin.IsComponentDisabled then
+        if self.orbitPlugin:IsComponentDisabled("HealthText") then
+            self.HealthText:Hide()
+            return
+        end
+    end
 
     local mode = self.healthTextMode or HEALTH_TEXT_MODES.PERCENT_SHORT
 
@@ -259,7 +267,7 @@ function UnitButtonMixin:UpdateHealthText()
         return
     end
 
-    if not self.healthTextEnabled then
+    if self.healthTextEnabled == false then
         self.HealthText:Hide()
         return
     end
@@ -489,6 +497,17 @@ function UnitButtonMixin:UpdateName()
     if not self.Name then
         return
     end
+    
+    -- Check if component is disabled via plugin (Canvas Mode drag-to-disable)
+    if self.orbitPlugin and self.orbitPlugin.IsComponentDisabled then
+        if self.orbitPlugin:IsComponentDisabled("Name") then
+            self.Name:Hide()
+            return
+        end
+    end
+    
+    -- Show name (may have been hidden by disabled state)
+    self.Name:Show()
     
     -- Guard against nil unit
     if not self.unit then

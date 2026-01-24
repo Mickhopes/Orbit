@@ -46,11 +46,11 @@ local SYSTEM_ID = "Orbit_PlayerResources"
 local SYSTEM_INDEX = 1
 
 local Plugin = Orbit:RegisterPlugin("Player Resources", SYSTEM_ID, {
+    canvasMode = true,
     defaults = {
         Hidden = false,
         Width = DEFAULTS.Width,
         Height = DEFAULTS.Height,
-        ShowText = true,
     },
 }, Orbit.Constants.PluginGroups.CooldownManager)
 
@@ -104,20 +104,7 @@ function Plugin:AddSettings(dialog, systemFrame)
         nil
     )
 
-    -- Show Text
-    table.insert(schema.controls, {
-        type = "checkbox",
-        key = "ShowText",
-        label = "Show Text",
-        default = true,
-        onChange = function(val)
-            self:SetSetting(systemIndex, "ShowText", val)
-            self:ApplySettings()
-            if OrbitEngine.Frame and OrbitEngine.Frame.ForceUpdateSelection then
-                OrbitEngine.Frame:ForceUpdateSelection(Frame)
-            end
-        end,
-    })
+    -- Note: Show Text is now controlled via Canvas Mode (drag Text to disabled dock)
 
     Orbit.Config:Render(dialog, systemFrame, self, schema)
 end
@@ -144,6 +131,7 @@ function Plugin:OnLoad()
         systemIndex = SYSTEM_INDEX,
         anchorOptions = { horizontal = false, vertical = true, mergeBorders = true }, -- Vertical stacking only
     })
+    self.frame = Frame  -- Expose for PluginMixin compatibility
 
     -- Text overlay (must be on a high frame level to be above buttons)
     if not Frame.Overlay then
@@ -276,6 +264,18 @@ function Plugin:OnLoad()
         end
     end)
 
+    -- Canvas Mode: Register draggable components
+    if OrbitEngine.ComponentDrag and Frame.Text then
+        OrbitEngine.ComponentDrag:Attach(Frame.Text, Frame, {
+            key = "Text",
+            onPositionChange = function(component, anchorX, anchorY, offsetX, offsetY, justifyH)
+                local positions = self:GetSetting(SYSTEM_INDEX, "ComponentPositions") or {}
+                positions.Text = { anchorX = anchorX, anchorY = anchorY, offsetX = offsetX, offsetY = offsetY, justifyH = justifyH }
+                self:SetSetting(SYSTEM_INDEX, "ComponentPositions", positions)
+            end
+        })
+    end
+
     self:UpdatePowerType()
     self:UpdatePower()
 end
@@ -320,13 +320,15 @@ function Plugin:ApplySettings()
     local spacing = borderSize
     local texture = self:GetSetting(systemIndex, "Texture")
     local fontName = self:GetSetting(systemIndex, "Font")
-    local showText = self:GetSetting(systemIndex, "ShowText")
 
     local isAnchored = OrbitEngine.Frame:GetAnchorParent(Frame) ~= nil
     -- Font & Text
     local fontPath = LSM:Fetch("font", fontName)
 
-    if showText ~= false then
+    -- Text (controlled via Canvas Mode)
+    if OrbitEngine.ComponentDrag:IsDisabled(Frame.Text) then
+        Frame.Text:Hide()
+    else
         Frame.Text:Show()
         local textSize = Orbit.Skin:GetAdaptiveTextSize(height, 18, 26, 1)
         Frame.Text:SetFont(fontPath, textSize, "OUTLINE")
@@ -337,8 +339,6 @@ function Plugin:ApplySettings()
         else
             Frame.Text:SetPoint("BOTTOM", Frame.Overlay, "BOTTOM", 0, -2)
         end
-    else
-        Frame.Text:Hide()
     end
 
     -- Size (Initial Set)
@@ -381,6 +381,12 @@ function Plugin:ApplySettings()
 
     -- 2. Restore Position (must happen AFTER layout for anchored frames)
     OrbitEngine.Frame:RestorePosition(Frame, self, systemIndex)
+
+    -- Restore component positions (Canvas Mode)
+    local savedPositions = self:GetSetting(systemIndex, "ComponentPositions")
+    if savedPositions and OrbitEngine.ComponentDrag then
+        OrbitEngine.ComponentDrag:RestoreFramePositions(Frame, savedPositions)
+    end
 
     -- 3. Update Visuals (Skinning Buttons)
     self:ApplyButtonVisuals()
@@ -762,7 +768,7 @@ function Plugin:UpdatePower()
         return
     end
 
-    local showText = self:GetSetting(SYSTEM_INDEX, "ShowText")
+    local textEnabled = not OrbitEngine.ComponentDrag:IsDisabled(Frame.Text)
     local colors = Orbit.Colors.PlayerResources
 
     -- [ CONTINUOUS RESOURCES ]--------------------------------------------------------------------------
@@ -781,7 +787,7 @@ function Plugin:UpdatePower()
                 Frame.StatusBar:SetStatusBarColor(color.r, color.g, color.b)
             end
 
-            if Frame.Text and showText then
+            if Frame.Text and textEnabled then
                 Frame.Text:SetFormattedText("%.0f", percent)
             end
             return
@@ -798,7 +804,7 @@ function Plugin:UpdatePower()
                 local color = isVoidMeta and colors.SoulFragmentsVoidMeta or colors.SoulFragments
                 Frame.StatusBar:SetStatusBarColor(color.r, color.g, color.b)
 
-                if Frame.Text and showText then
+                if Frame.Text and textEnabled then
                     Frame.Text:SetText(current)
                 end
             elseif Frame.StatusBar then
@@ -819,7 +825,7 @@ function Plugin:UpdatePower()
                 local color = colors.EbonMight
                 Frame.StatusBar:SetStatusBarColor(color.r, color.g, color.b)
 
-                if Frame.Text and showText then
+                if Frame.Text and textEnabled then
                     Frame.Text:SetFormattedText("%.0f", current)
                 end
             elseif Frame.StatusBar then
@@ -847,7 +853,7 @@ function Plugin:UpdatePower()
                 Frame.StatusBar:SetStatusBarColor(color.r, color.g, color.b)
             end
 
-            if Frame.Text and showText then
+            if Frame.Text and textEnabled then
                 local percent = SafeUnitPowerPercent("player", Enum.PowerType.Mana)
                 if percent then
                     Frame.Text:SetFormattedText("%.0f", percent)

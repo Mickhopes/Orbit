@@ -358,6 +358,21 @@ function ComponentDrag:GetAlignment(component)
     return data and data.currentAlignment or "LEFT"
 end
 
+-- Check if a component is disabled via Canvas Mode
+-- Uses the key stored during Attach and checks the parent frame's plugin
+function ComponentDrag:IsDisabled(component)
+    local data = registeredComponents[component]
+    if not data then return false end
+    
+    local parent = data.parent
+    local plugin = parent and parent.orbitPlugin
+    if plugin and plugin.IsComponentDisabled then
+        return plugin:IsComponentDisabled(data.key)
+    end
+    
+    return false
+end
+
 function ComponentDrag:RestoreFramePositions(parent, positions)
     local components = frameComponents[parent]
     if not components or not positions then return end

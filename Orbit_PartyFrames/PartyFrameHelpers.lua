@@ -26,27 +26,30 @@ Helpers.LAYOUT = {
 -- @param frameHeight number - height of each frame
 -- @param spacing number - spacing between frames
 -- @param orientation number - 0 = vertical, 1 = horizontal
+-- @param auraSpacing number - extra spacing for above/below aura containers (optional)
 -- @return width number, height number
-function Helpers:CalculateContainerSize(numFrames, frameWidth, frameHeight, spacing, orientation)
+function Helpers:CalculateContainerSize(numFrames, frameWidth, frameHeight, spacing, orientation, auraSpacing)
     spacing = spacing or self.LAYOUT.Spacing
     orientation = orientation or 0
+    auraSpacing = auraSpacing or 0
     
     if numFrames < 1 then
         numFrames = 1
     end
     
+    -- Total effective spacing includes base spacing + aura container height
+    local effectiveSpacing = spacing + auraSpacing
+    
     if orientation == 0 then
         -- Vertical layout
-        local totalHeight = (numFrames * frameHeight) + ((numFrames - 1) * spacing)
+        local totalHeight = (numFrames * frameHeight) + ((numFrames - 1) * effectiveSpacing)
         return frameWidth, totalHeight
     else
         -- Horizontal layout
-        local totalWidth = (numFrames * frameWidth) + ((numFrames - 1) * spacing)
+        local totalWidth = (numFrames * frameWidth) + ((numFrames - 1) * effectiveSpacing)
         return totalWidth, frameHeight
     end
 end
-
--- [ FRAME LAYOUT ]----------------------------------------------------------------------------------
 
 --- Calculate frame position within container
 -- @param index number - 1-based frame index
@@ -54,12 +57,16 @@ end
 -- @param frameHeight number - height of each frame
 -- @param spacing number - spacing between frames
 -- @param orientation number - 0 = vertical, 1 = horizontal
+-- @param auraSpacing number - extra spacing for above/below aura containers (optional)
 -- @return xOffset number, yOffset number
-function Helpers:CalculateFramePosition(index, frameWidth, frameHeight, spacing, orientation)
+function Helpers:CalculateFramePosition(index, frameWidth, frameHeight, spacing, orientation, auraSpacing)
     spacing = spacing or self.LAYOUT.Spacing
     orientation = orientation or 0
+    auraSpacing = auraSpacing or 0
     
-    local offset = (index - 1) * (orientation == 0 and (frameHeight + spacing) or (frameWidth + spacing))
+    -- Total effective spacing includes base spacing + aura container height
+    local effectiveSpacing = spacing + auraSpacing
+    local offset = (index - 1) * (orientation == 0 and (frameHeight + effectiveSpacing) or (frameWidth + effectiveSpacing))
     
     if orientation == 0 then
         -- Vertical: Stack downward

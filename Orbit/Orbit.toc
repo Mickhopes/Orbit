@@ -86,16 +86,17 @@ Core\Mixins\AuraMixin.lua
 Core\Mixins\VisualsExtendedMixin.lua
 Core\Mixins\ResourceBarMixin.lua
 Core\Mixins\AggroIndicatorMixin.lua
+Core\Mixins\StatusIconMixin.lua
 
 # Managers
 Core\Managers\CombatManager.lua
 Core\Managers\PositionManager.lua
 Core\Managers\ProfileManager.lua
 
-# Init (includes ErrorHandler and Visibility)
+# Init
 Core\Init.lua
 
-# API (Public Facade)
+# API
 Core\API.lua
 
 # Preview System
@@ -106,7 +107,12 @@ Core\Engine\Preview\PreviewController.lua
 # UI
 Core\UI\Animation.lua
 Core\UI\OrbitSettingsDialog.lua
-Core\UI\CanvasModeDialog.lua
+# Canvas Mode
+Core\UI\CanvasMode\Init.lua
+Core\UI\CanvasMode\Viewport.lua
+Core\UI\CanvasMode\Dock.lua
+Core\UI\CanvasMode\DragComponent.lua
+Core\UI\CanvasMode\Dialog.lua
 Core\UI\CanvasModeComponentSettings.lua
 Core\UI\OrbitOptionsPanel.lua
 Core\UI\OrbitOptionsButton.lua

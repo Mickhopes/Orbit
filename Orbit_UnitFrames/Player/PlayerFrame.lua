@@ -40,6 +40,8 @@ local Plugin = Orbit:RegisterPlugin("Player Frame", SYSTEM_ID, {
         AggroIndicatorEnabled = true,
         AggroColor = { r = 1.0, g = 0.0, b = 0.0, a = 1 },
         AggroThickness = 2,
+        -- Disabled components (Canvas Mode drag-to-disable)
+        DisabledComponents = {},
         -- Default component positions (Canvas Mode is single source of truth)
         ComponentPositions = {
             Name = { anchorX = "LEFT", offsetX = 5, anchorY = "CENTER", offsetY = 0, justifyH = "LEFT" },
@@ -54,8 +56,19 @@ local Plugin = Orbit:RegisterPlugin("Player Frame", SYSTEM_ID, {
     },
 }, Orbit.Constants.PluginGroups.UnitFrames)
 
--- Apply Mixins (including aggro indicator support)
-Mixin(Plugin, Orbit.UnitFrameMixin, Orbit.VisualsExtendedMixin, Orbit.AggroIndicatorMixin)
+-- Apply Mixins (including aggro indicator support and shared status icons)
+Mixin(Plugin, Orbit.UnitFrameMixin, Orbit.VisualsExtendedMixin, Orbit.AggroIndicatorMixin, Orbit.StatusIconMixin)
+
+-- Check if a component is disabled (Canvas Mode drag-to-disable)
+function Plugin:IsComponentDisabled(componentKey)
+    local disabled = self:GetSetting(PLAYER_FRAME_INDEX, "DisabledComponents") or {}
+    for _, key in ipairs(disabled) do
+        if key == componentKey then
+            return true
+        end
+    end
+    return false
+end
 
 -- [ SETTINGS UI ]-----------------------------------------------------------------------------------
 function Plugin:AddSettings(dialog, systemFrame)
@@ -97,71 +110,8 @@ function Plugin:AddSettings(dialog, systemFrame)
         end,
     })
 
-    table.insert(controls, {
-        type = "checkbox",
-        key = "ShowLevel",
-        label = "Show Level",
-        default = false,
-        onChange = function(val)
-            self:SetSetting(PLAYER_FRAME_INDEX, "ShowLevel", val)
-            self:UpdateVisualsExtended(self.frame, PLAYER_FRAME_INDEX)
-        end,
-    })
-
-    table.insert(controls, {
-        type = "checkbox",
-        key = "ShowCombatIcon",
-        label = "Show Combat Icon",
-        default = false,
-        onChange = function(val)
-            self:SetSetting(PLAYER_FRAME_INDEX, "ShowCombatIcon", val)
-            self:UpdateCombatIcon(self.frame, PLAYER_FRAME_INDEX)
-        end,
-    })
-
-    table.insert(controls, {
-        type = "checkbox",
-        key = "ShowRoleIcon",
-        label = "Show Role Icon",
-        default = false,
-        onChange = function(val)
-            self:SetSetting(PLAYER_FRAME_INDEX, "ShowRoleIcon", val)
-            self:UpdateRoleIcon(self.frame, PLAYER_FRAME_INDEX)
-        end,
-    })
-
-    table.insert(controls, {
-        type = "checkbox",
-        key = "ShowLeaderIcon",
-        label = "Show Leader Icon",
-        default = false,
-        onChange = function(val)
-            self:SetSetting(PLAYER_FRAME_INDEX, "ShowLeaderIcon", val)
-            self:UpdateLeaderIcon(self.frame, PLAYER_FRAME_INDEX)
-        end,
-    })
-
-    table.insert(controls, {
-        type = "checkbox",
-        key = "ShowMarkerIcon",
-        label = "Show Marker Icon",
-        default = false,
-        onChange = function(val)
-            self:SetSetting(PLAYER_FRAME_INDEX, "ShowMarkerIcon", val)
-            self:UpdateMarkerIcon(self.frame, PLAYER_FRAME_INDEX)
-        end,
-    })
-
-    table.insert(controls, {
-        type = "checkbox",
-        key = "ShowGroupPosition",
-        label = "Show Group Position",
-        default = false,
-        onChange = function(val)
-            self:SetSetting(PLAYER_FRAME_INDEX, "ShowGroupPosition", val)
-            self:UpdateGroupPosition(self.frame, PLAYER_FRAME_INDEX)
-        end,
-    })
+    -- Note: Component visibility (Level, CombatIcon, RoleIcon, LeaderIcon, MarkerIcon, GroupPosition)
+    -- is now controlled via Canvas Mode drag-to-disable
 
     table.insert(controls, {
         type = "checkbox",
@@ -263,9 +213,10 @@ function Plugin:OnLoad()
     end
 
     -- Create CombatIcon (on overlay frame) using modern Blizzard atlas
+    local previewAtlases = Orbit.IconPreviewAtlases or {}
     if not self.frame.CombatIcon then
         self.frame.CombatIcon = self.frame.OverlayFrame:CreateTexture(nil, "OVERLAY", nil, 7)
-        self.frame.CombatIcon:SetAtlas("UI-HUD-UnitFrame-Player-CombatIcon", true) -- useAtlasSize=true
+        self.frame.CombatIcon:SetAtlas(previewAtlases.CombatIcon or "UI-HUD-UnitFrame-Player-CombatIcon", true)
         self.frame.CombatIcon:SetPoint("TOPRIGHT", self.frame, "TOPLEFT", -2, 0)
         self.frame.CombatIcon:Hide()
     end
@@ -276,6 +227,7 @@ function Plugin:OnLoad()
         self.frame.RoleIcon = self.frame.OverlayFrame:CreateTexture(nil, "OVERLAY", nil, 7)
         self.frame.RoleIcon:SetSize(iconSize, iconSize)
         self.frame.RoleIcon:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 2, -2)
+        self.frame.RoleIcon:SetAtlas(previewAtlases.RoleIcon or "UI-LFG-RoleIcon-DPS-Micro-GroupFinder")
         self.frame.RoleIcon:Hide()
     end
 
@@ -284,6 +236,7 @@ function Plugin:OnLoad()
         self.frame.LeaderIcon = self.frame.OverlayFrame:CreateTexture(nil, "OVERLAY", nil, 7)
         self.frame.LeaderIcon:SetSize(iconSize, iconSize)
         self.frame.LeaderIcon:SetPoint("LEFT", self.frame.RoleIcon, "RIGHT", 2, 0)
+        self.frame.LeaderIcon:SetAtlas(previewAtlases.LeaderIcon or "UI-HUD-UnitFrame-Player-Group-LeaderIcon")
         self.frame.LeaderIcon:Hide()
     end
 
@@ -292,16 +245,27 @@ function Plugin:OnLoad()
         self.frame.MarkerIcon = self.frame.OverlayFrame:CreateTexture(nil, "OVERLAY", nil, 7)
         self.frame.MarkerIcon:SetSize(iconSize, iconSize)
         self.frame.MarkerIcon:SetPoint("TOPRIGHT", self.frame, "TOPRIGHT", -2, -2)
-        self.frame.MarkerIcon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
+        self.frame.MarkerIcon:SetTexture(previewAtlases.MarkerIcon or "Interface\\TargetingFrame\\UI-RaidTargetingIcons")
+        local tc = Orbit.MarkerIconTexCoord or { 0.75, 1, 0.25, 0.5 }
+        self.frame.MarkerIcon:SetTexCoord(tc[1], tc[2], tc[3], tc[4])
         self.frame.MarkerIcon:Hide()
     end
 
     -- Create GroupPositionText (uses global font, set in ApplySettings)
     if not self.frame.GroupPositionText then
-        self.frame.GroupPositionText = self.frame.OverlayFrame:CreateFontString(nil, "OVERLAY")
+        self.frame.GroupPositionText = self.frame.OverlayFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         self.frame.GroupPositionText:SetDrawLayer("OVERLAY", 7)
         self.frame.GroupPositionText:SetPoint("BOTTOMLEFT", self.frame, "BOTTOMLEFT", 2, 2)
         self.frame.GroupPositionText:Hide()
+    end
+
+    -- Create ReadyCheckIcon
+    if not self.frame.ReadyCheckIcon then
+        self.frame.ReadyCheckIcon = self.frame.OverlayFrame:CreateTexture(nil, "OVERLAY", nil, 7)
+        self.frame.ReadyCheckIcon:SetSize(iconSize, iconSize)
+        self.frame.ReadyCheckIcon:SetPoint("CENTER", self.frame, "CENTER", 0, 0)
+        self.frame.ReadyCheckIcon:SetAtlas(previewAtlases.ReadyCheckIcon or "UI-LFG-ReadyMark-Raid")
+        self.frame.ReadyCheckIcon:Hide()
     end
 
     -- Register LevelText and CombatIcon for component drag with persistence callbacks
@@ -355,6 +319,14 @@ function Plugin:OnLoad()
                 pluginRef:SetSetting(PLAYER_FRAME_INDEX, "ComponentPositions", positions)
             end
         })
+        OrbitEngine.ComponentDrag:Attach(self.frame.ReadyCheckIcon, self.frame, {
+            key = "ReadyCheckIcon",
+            onPositionChange = function(component, anchorX, anchorY, offsetX, offsetY)
+                local positions = pluginRef:GetSetting(PLAYER_FRAME_INDEX, "ComponentPositions") or {}
+                positions.ReadyCheckIcon = { anchorX = anchorX, anchorY = anchorY, offsetX = offsetX, offsetY = offsetY }
+                pluginRef:SetSetting(PLAYER_FRAME_INDEX, "ComponentPositions", positions)
+            end
+        })
     end
 
     -- Register combat events for CombatIcon
@@ -368,6 +340,11 @@ function Plugin:OnLoad()
     self.frame:RegisterEvent("PARTY_LEADER_CHANGED")
     self.frame:RegisterEvent("RAID_TARGET_UPDATE")
     
+    -- Register ready check events
+    self.frame:RegisterEvent("READY_CHECK")
+    self.frame:RegisterEvent("READY_CHECK_CONFIRM")
+    self.frame:RegisterEvent("READY_CHECK_FINISHED")
+    
     -- Register threat events for aggro indicator
     self.frame:RegisterUnitEvent("UNIT_THREAT_SITUATION_UPDATE", "player")
 
@@ -375,33 +352,36 @@ function Plugin:OnLoad()
     local originalOnEvent = self.frame:GetScript("OnEvent")
     self.frame:SetScript("OnEvent", function(f, event, ...)
         if event == "PLAYER_REGEN_DISABLED" then
-            self:UpdateCombatIcon(f, PLAYER_FRAME_INDEX)
+            self:UpdateCombatIcon(f, self)
             return
         elseif event == "PLAYER_REGEN_ENABLED" then
-            self:UpdateCombatIcon(f, PLAYER_FRAME_INDEX)
+            self:UpdateCombatIcon(f, self)
             return
         elseif event == "PLAYER_LEVEL_UP" then
             self:UpdateVisualsExtended(f, PLAYER_FRAME_INDEX)
             return
         elseif event == "PLAYER_ROLES_ASSIGNED" then
-            self:UpdateRoleIcon(f, PLAYER_FRAME_INDEX)
+            self:UpdateRoleIcon(f, self)
             return
         elseif event == "GROUP_ROSTER_UPDATE" then
-            self:UpdateRoleIcon(f, PLAYER_FRAME_INDEX)
-            self:UpdateLeaderIcon(f, PLAYER_FRAME_INDEX)
-            self:UpdateGroupPosition(f, PLAYER_FRAME_INDEX)
+            self:UpdateRoleIcon(f, self)
+            self:UpdateLeaderIcon(f, self)
+            self:UpdateGroupPosition(f, self)
             return
         elseif event == "PARTY_LEADER_CHANGED" then
-            self:UpdateLeaderIcon(f, PLAYER_FRAME_INDEX)
+            self:UpdateLeaderIcon(f, self)
             return
         elseif event == "RAID_TARGET_UPDATE" then
-            self:UpdateMarkerIcon(f, PLAYER_FRAME_INDEX)
+            self:UpdateMarkerIcon(f, self)
             return
         elseif event == "UNIT_THREAT_SITUATION_UPDATE" then
             -- Update aggro indicator
             if self.UpdateAggroIndicator then
                 self:UpdateAggroIndicator(f, self)
             end
+            return
+        elseif event == "READY_CHECK" or event == "READY_CHECK_CONFIRM" or event == "READY_CHECK_FINISHED" then
+            self:UpdateReadyCheck(f, self)
             return
         end
         if originalOnEvent then
@@ -454,11 +434,12 @@ function Plugin:ApplySettings(frame)
 
     -- 3. Apply Extended Visuals (Level, Combat Icon, Status Icons)
     self:UpdateVisualsExtended(frame, systemIndex)
-    self:UpdateCombatIcon(frame, systemIndex)
-    self:UpdateRoleIcon(frame, systemIndex)
-    self:UpdateLeaderIcon(frame, systemIndex)
-    self:UpdateMarkerIcon(frame, systemIndex)
-    self:UpdateGroupPosition(frame, systemIndex)
+    self:UpdateCombatIcon(frame, self)
+    self:UpdateRoleIcon(frame, self)
+    self:UpdateLeaderIcon(frame, self)
+    self:UpdateMarkerIcon(frame, self)
+    self:UpdateGroupPosition(frame, self)
+    self:UpdateReadyCheck(frame, self)
 
     -- 4. Apply Health Text Mode
     local healthTextMode = self:GetSetting(systemIndex, "HealthTextMode") or "percent_short"
@@ -488,188 +469,15 @@ function Plugin:UpdateVisuals(frame)
     if frame and frame.UpdateAll then
         frame:UpdateAll()
         self:UpdateVisualsExtended(frame, PLAYER_FRAME_INDEX)
-        self:UpdateCombatIcon(frame, PLAYER_FRAME_INDEX)
-        self:UpdateRoleIcon(frame, PLAYER_FRAME_INDEX)
-        self:UpdateLeaderIcon(frame, PLAYER_FRAME_INDEX)
-        self:UpdateMarkerIcon(frame, PLAYER_FRAME_INDEX)
-        self:UpdateGroupPosition(frame, PLAYER_FRAME_INDEX)
+        -- Use shared StatusIconMixin methods
+        self:UpdateCombatIcon(frame, self)
+        self:UpdateRoleIcon(frame, self)
+        self:UpdateLeaderIcon(frame, self)
+        self:UpdateMarkerIcon(frame, self)
+        self:UpdateGroupPosition(frame, self)
     end
 end
 
--- [ COMBAT ICON ]-----------------------------------------------------------------------------------
+-- Icon update functions (UpdateCombatIcon, UpdateRoleIcon, UpdateLeaderIcon, UpdateMarkerIcon, UpdateGroupPosition)
+-- are now provided by StatusIconMixin (mixed in above)
 
-function Plugin:UpdateCombatIcon(frame, systemIndex)
-    if not frame or not frame.CombatIcon then
-        return
-    end
-
-    local showCombatIcon = self:GetSetting(systemIndex, "ShowCombatIcon")
-    if not showCombatIcon then
-        frame.CombatIcon:Hide()
-        return
-    end
-
-    -- Show icon in combat, OR in Edit Mode for preview
-    local inCombat = UnitAffectingCombat("player")
-    local inEditMode = EditModeManagerFrame and EditModeManagerFrame:IsEditModeActive()
-    
-    if inCombat or inEditMode then
-        frame.CombatIcon:Show()
-    else
-        frame.CombatIcon:Hide()
-    end
-end
-
--- [ ROLE ICON ]-------------------------------------------------------------------------------------
-
-function Plugin:UpdateRoleIcon(frame, systemIndex)
-    if not frame or not frame.RoleIcon then
-        return
-    end
-
-    local showRoleIcon = self:GetSetting(systemIndex, "ShowRoleIcon")
-    if not showRoleIcon then
-        frame.RoleIcon:Hide()
-        return
-    end
-
-    -- Check for vehicle first
-    if UnitInVehicle("player") and UnitHasVehicleUI("player") then
-        frame.RoleIcon:SetAtlas("RaidFrame-Icon-Vehicle")
-        frame.RoleIcon:Show()
-        return
-    end
-
-    local role = UnitGroupRolesAssigned("player")
-    local roleAtlas = ROLE_ATLASES[role]
-    
-    -- In Edit Mode, show a preview role icon if no role assigned
-    local inEditMode = EditModeManagerFrame and EditModeManagerFrame:IsEditModeActive()
-    if roleAtlas then
-        frame.RoleIcon:SetAtlas(roleAtlas)
-        frame.RoleIcon:Show()
-    elseif inEditMode then
-        -- Show DPS icon as preview in Edit Mode
-        frame.RoleIcon:SetAtlas(ROLE_ATLASES["DAMAGER"])
-        frame.RoleIcon:Show()
-    else
-        frame.RoleIcon:Hide()
-    end
-end
-
--- [ LEADER ICON ]-----------------------------------------------------------------------------------
-
-function Plugin:UpdateLeaderIcon(frame, systemIndex)
-    if not frame or not frame.LeaderIcon then
-        return
-    end
-
-    local showLeaderIcon = self:GetSetting(systemIndex, "ShowLeaderIcon")
-    if not showLeaderIcon then
-        frame.LeaderIcon:Hide()
-        return
-    end
-
-    -- In Edit Mode, show a preview leader icon
-    local inEditMode = EditModeManagerFrame and EditModeManagerFrame:IsEditModeActive()
-    
-    if UnitIsGroupLeader("player") then
-        frame.LeaderIcon:SetAtlas("UI-HUD-UnitFrame-Player-Group-LeaderIcon")
-        frame.LeaderIcon:Show()
-    elseif UnitIsGroupAssistant("player") then
-        frame.LeaderIcon:SetAtlas("UI-HUD-UnitFrame-Player-Group-AssistantIcon")
-        frame.LeaderIcon:Show()
-    elseif inEditMode then
-        -- Show leader icon as preview in Edit Mode
-        frame.LeaderIcon:SetAtlas("UI-HUD-UnitFrame-Player-Group-LeaderIcon")
-        frame.LeaderIcon:Show()
-    else
-        frame.LeaderIcon:Hide()
-    end
-end
-
--- [ MARKER ICON ]-----------------------------------------------------------------------------------
-
-function Plugin:UpdateMarkerIcon(frame, systemIndex)
-    if not frame or not frame.MarkerIcon then
-        return
-    end
-
-    local showMarkerIcon = self:GetSetting(systemIndex, "ShowMarkerIcon")
-    if not showMarkerIcon then
-        frame.MarkerIcon:Hide()
-        return
-    end
-
-    local raidTargetIndex = GetRaidTargetIndex("player")
-    
-    -- In Edit Mode or Canvas Mode, show a preview marker icon if none assigned
-    local inEditMode = EditModeManagerFrame and EditModeManagerFrame:IsEditModeActive()
-    local inCanvasMode = OrbitEngine.ComponentEdit and OrbitEngine.ComponentEdit:IsActive(frame)
-    
-    -- Helper to set raid target icon using sprite sheet
-    -- Also stores the index for Canvas Mode cloning
-    local function SetMarkerTexCoords(iconIndex)
-        frame.MarkerIcon:SetSpriteSheetCell(iconIndex, RAID_TARGET_TEXTURE_ROWS, RAID_TARGET_TEXTURE_COLUMNS)
-        frame.MarkerIcon.orbitSpriteIndex = iconIndex  -- Store for Canvas Mode clone
-    end
-    
-    if raidTargetIndex then
-        SetMarkerTexCoords(raidTargetIndex)
-        frame.MarkerIcon:Show()
-    elseif inEditMode or inCanvasMode then
-        -- Show skull marker as preview in Edit Mode or Canvas Mode (index 8)
-        SetMarkerTexCoords(8)
-        frame.MarkerIcon:Show()
-    else
-        frame.MarkerIcon:Hide()
-    end
-end
-
--- [ GROUP POSITION TEXT ]---------------------------------------------------------------------------
-
-function Plugin:UpdateGroupPosition(frame, systemIndex)
-    if not frame or not frame.GroupPositionText then
-        return
-    end
-
-    local showGroupPosition = self:GetSetting(systemIndex, "ShowGroupPosition")
-    if not showGroupPosition then
-        frame.GroupPositionText:Hide()
-        return
-    end
-
-    -- Apply global font
-    local globalFontName = Orbit.db and Orbit.db.GlobalSettings and Orbit.db.GlobalSettings.Font
-    local fontPath = LSM:Fetch("font", globalFontName) or "Fonts\\FRIZQT__.TTF"
-    local textSize = 10
-    frame.GroupPositionText:SetFont(fontPath, textSize, "OUTLINE")
-    frame.GroupPositionText:SetShadowColor(0, 0, 0, 1)
-    frame.GroupPositionText:SetShadowOffset(1, -1)
-
-    -- Only show in raids
-    local isInRaid = IsInRaid()
-    local inEditMode = EditModeManagerFrame and EditModeManagerFrame:IsEditModeActive()
-    
-    if isInRaid then
-        -- Show the player's raid subgroup number (e.g., "G1")
-        local raidIndex = UnitInRaid("player")
-        if raidIndex then
-            local _, _, subgroup = GetRaidRosterInfo(raidIndex + 1)
-            if subgroup then
-                frame.GroupPositionText:SetText("G" .. subgroup)
-                frame.GroupPositionText:Show()
-            else
-                frame.GroupPositionText:Hide()
-            end
-        else
-            frame.GroupPositionText:Hide()
-        end
-    elseif inEditMode then
-        -- Show preview in Edit Mode
-        frame.GroupPositionText:SetText("G1")
-        frame.GroupPositionText:Show()
-    else
-        frame.GroupPositionText:Hide()
-    end
-end

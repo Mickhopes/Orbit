@@ -12,6 +12,7 @@ local SYSTEM_INDEX = 1 -- Arbitrary index for simple plugin? Or specific enum?
 local PET_FRAME_INDEX = (Enum.EditModeUnitFrameSystemIndices and Enum.EditModeUnitFrameSystemIndices.Pet) or 3
 
 local Plugin = Orbit:RegisterPlugin("Pet Frame", SYSTEM_ID, {
+    canvasMode = true,  -- Enable Canvas Mode for component editing
     defaults = {
         Width = 100,
         Height = 20,
@@ -97,6 +98,30 @@ function Plugin:OnLoad()
     -- Attach to Orbit Frame system
     OrbitEngine.Frame:AttachSettingsListener(self.frame, self, PET_FRAME_INDEX)
 
+    -- Canvas Mode: Register draggable components
+    if OrbitEngine.ComponentDrag then
+        if self.frame.Name then
+            OrbitEngine.ComponentDrag:Attach(self.frame.Name, self.frame, {
+                key = "Name",
+                onPositionChange = function(component, anchorX, anchorY, offsetX, offsetY, justifyH)
+                    local positions = self:GetSetting(PET_FRAME_INDEX, "ComponentPositions") or {}
+                    positions.Name = { anchorX = anchorX, anchorY = anchorY, offsetX = offsetX, offsetY = offsetY, justifyH = justifyH }
+                    self:SetSetting(PET_FRAME_INDEX, "ComponentPositions", positions)
+                end
+            })
+        end
+        if self.frame.HealthText then
+            OrbitEngine.ComponentDrag:Attach(self.frame.HealthText, self.frame, {
+                key = "HealthText",
+                onPositionChange = function(component, anchorX, anchorY, offsetX, offsetY, justifyH)
+                    local positions = self:GetSetting(PET_FRAME_INDEX, "ComponentPositions") or {}
+                    positions.HealthText = { anchorX = anchorX, anchorY = anchorY, offsetX = offsetX, offsetY = offsetY, justifyH = justifyH }
+                    self:SetSetting(PET_FRAME_INDEX, "ComponentPositions", positions)
+                end
+            })
+        end
+    end
+
     -- Apply settings
     self:ApplySettings(self.frame)
 
@@ -173,10 +198,16 @@ function Plugin:ApplySettings(frame)
         frame.Name:SetShadowOffset(1, -1)
     end
 
-    -- Disable Health Text (too small for this frame)
-    frame.healthTextEnabled = false
+    -- HealthText: Check Canvas Mode disabled state (Canvas Mode is source of truth)
+    local healthTextDisabled = self:IsComponentDisabled("HealthText")
     if frame.HealthText then
-        frame.HealthText:Hide()
+        if healthTextDisabled then
+            frame.HealthText:Hide()
+            frame.healthTextEnabled = false
+        else
+            frame.healthTextEnabled = true
+            -- HealthText will be shown/updated by frame:UpdateAll()
+        end
     end
 
     -- Stub UpdateTextLayout to prevent it from overriding centered name
@@ -198,6 +229,12 @@ function Plugin:ApplySettings(frame)
 
     -- Restore position (Again, to be safe post-update)
     OrbitEngine.Frame:RestorePosition(frame, self, systemIndex)
+
+    -- Restore Component Positions (Canvas Mode)
+    local savedPositions = self:GetSetting(systemIndex, "ComponentPositions")
+    if savedPositions and OrbitEngine.ComponentDrag then
+        OrbitEngine.ComponentDrag:RestoreFramePositions(frame, savedPositions)
+    end
     
     -- Ensure visibility is correctly set (Edit Mode awareness)
     self:UpdateVisibility()
