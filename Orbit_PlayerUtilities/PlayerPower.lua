@@ -8,29 +8,15 @@ local SMOOTH_ANIM = Enum.StatusBarInterpolation and Enum.StatusBarInterpolation.
 
 -- [ HELPERS ]----------------------------------------------------------------------------------------
 local function SafeUnitPowerPercent(unit, resource)
-    if type(UnitPowerPercent) == "function" then
-        local ok, pct
-        if CurveConstants and CurveConstants.ScaleTo100 then
-            ok, pct = pcall(UnitPowerPercent, unit, resource, false, CurveConstants.ScaleTo100)
-        else
-            ok, pct = pcall(UnitPowerPercent, unit, resource, false, true)
-        end
-
-        if not ok or pct == nil then
-            ok, pct = pcall(UnitPowerPercent, unit, resource, false)
-        end
-
-        if ok and pct ~= nil then
-            return pct
-        end
+    if type(UnitPowerPercent) ~= "function" then
+        return nil
     end
-
-    if UnitPower and UnitPowerMax then
-        local cur = UnitPower(unit, resource)
-        local max = UnitPowerMax(unit, resource)
-        if cur and max and max > 0 then
-            return (cur / max) * 100
-        end
+    if not CurveConstants or not CurveConstants.ScaleTo100 then
+        return nil
+    end
+    local ok, pct = pcall(UnitPowerPercent, unit, resource, false, CurveConstants.ScaleTo100)
+    if ok and pct ~= nil then
+        return pct
     end
     return nil
 end

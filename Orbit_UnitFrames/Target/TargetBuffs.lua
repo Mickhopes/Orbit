@@ -240,7 +240,6 @@ function Plugin:UpdateBuffs()
         end
     end
 
-    -- Skin Settings
     local skinSettings = {
         zoom = 0,
         borderStyle = 1, -- Pixel Perfect

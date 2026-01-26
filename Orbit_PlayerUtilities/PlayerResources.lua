@@ -14,29 +14,15 @@ local SMOOTH_ANIM = Enum.StatusBarInterpolation and Enum.StatusBarInterpolation.
 
 -- [ HELPERS ]----------------------------------------------------------------------------------------
 local function SafeUnitPowerPercent(unit, resource)
-    if type(UnitPowerPercent) == "function" then
-        local ok, pct
-        if CurveConstants and CurveConstants.ScaleTo100 then
-            ok, pct = pcall(UnitPowerPercent, unit, resource, false, CurveConstants.ScaleTo100)
-        else
-            ok, pct = pcall(UnitPowerPercent, unit, resource, false, true)
-        end
-
-        if not ok or pct == nil then
-            ok, pct = pcall(UnitPowerPercent, unit, resource, false)
-        end
-
-        if ok and pct ~= nil then
-            return pct
-        end
+    if type(UnitPowerPercent) ~= "function" then
+        return nil
     end
-
-    if UnitPower and UnitPowerMax then
-        local cur = UnitPower(unit, resource)
-        local max = UnitPowerMax(unit, resource)
-        if cur and max and max > 0 then
-            return (cur / max) * 100
-        end
+    if not CurveConstants or not CurveConstants.ScaleTo100 then
+        return nil
+    end
+    local ok, pct = pcall(UnitPowerPercent, unit, resource, false, CurveConstants.ScaleTo100)
+    if ok and pct ~= nil then
+        return pct
     end
     return nil
 end
@@ -776,19 +762,20 @@ function Plugin:UpdatePower()
 
         -- STAGGER (Brewmaster Monk)
         if self.continuousResource == "STAGGER" then
-            local stagger, maxHealth, percent, level = ResourceMixin:GetStaggerState()
+            local stagger, maxHealth, level = ResourceMixin:GetStaggerState()
 
             if Frame.StatusBar then
                 Frame.StatusBar:SetMinMaxValues(0, maxHealth)
                 Frame.StatusBar:SetValue(stagger, SMOOTH_ANIM)
 
-                -- Dynamic color based on stagger level
+                -- Dynamic color based on stagger level (determined via aura check, not arithmetic)
                 local color = colors["Stagger" .. level:sub(1, 1) .. level:sub(2):lower()] or colors.StaggerLow
                 Frame.StatusBar:SetStatusBarColor(color.r, color.g, color.b)
             end
 
+            -- Text disabled - percent calculation forbidden on secret values
             if Frame.Text and textEnabled then
-                Frame.Text:SetFormattedText("%.0f", percent)
+                Frame.Text:SetText("")
             end
             return
         end

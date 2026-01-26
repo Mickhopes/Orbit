@@ -146,42 +146,17 @@ local HEALTH_TEXT_MODES = {
 UnitButton.HEALTH_TEXT_MODES = HEALTH_TEXT_MODES
 
 local function SafeHealthPercent(unit)
-    if type(UnitHealthPercent) == "function" then
-        local ok, pct
-
-        if CurveConstants and CurveConstants.ScaleTo100 then
-            ok, pct = pcall(UnitHealthPercent, unit, true, CurveConstants.ScaleTo100)
-            if ok and pct ~= nil and type(pct) == "number" then
-                return pct
-            end
-        end
-
-        ok, pct = pcall(UnitHealthPercent, unit, true, true)
-        if ok and pct ~= nil and type(pct) == "number" then
-            if pct <= 1 and pct >= 0 then
-                return pct * 100
-            end
-            return pct
-        end
-
-        ok, pct = pcall(UnitHealthPercent, unit)
-        if ok and pct ~= nil and type(pct) == "number" then
-            if pct <= 1 and pct >= 0 then
-                return pct * 100
-            end
-            return pct
-        end
-    end
-
-    local ok, result = pcall(function()
-        local cur = UnitHealth(unit)
-        local max = UnitHealthMax(unit)
-        if type(cur) == "number" and type(max) == "number" and max > 0 then
-            return (cur / max) * 100
-        end
+    if type(UnitHealthPercent) ~= "function" then
         return nil
-    end)
-    return ok and result or nil
+    end
+    if not CurveConstants or not CurveConstants.ScaleTo100 then
+        return nil
+    end
+    local ok, pct = pcall(UnitHealthPercent, unit, true, CurveConstants.ScaleTo100)
+    if ok and pct ~= nil and type(pct) == "number" then
+        return pct
+    end
+    return nil
 end
 
 local function FormatHealthPercent(unit)

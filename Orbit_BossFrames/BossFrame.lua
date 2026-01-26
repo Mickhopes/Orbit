@@ -27,6 +27,8 @@ local Plugin = Orbit:RegisterPlugin("Boss Frames", SYSTEM_ID, {
         CastBarWidth = 140,
         CastBarIcon = true,
         ReactionColour = true, -- Enable reaction color by default
+        PandemicGlowType = Orbit.Constants.PandemicGlow.DefaultType,
+        PandemicGlowColor = Orbit.Constants.PandemicGlow.DefaultColor,
         -- Disabled components (Canvas Mode drag-to-disable)
         DisabledComponents = {},
     },
@@ -224,11 +226,15 @@ local function UpdateDebuffs(frame, plugin)
 
     -- Prepare Skin Settings
     local globalBorder = plugin:GetPlayerSetting("BorderSize")
+    local Constants = Orbit.Constants
     local skinSettings = {
         zoom = 0, -- Inherit/Default
         borderStyle = 1, -- Pixel Perfect
         borderSize = globalBorder,
         showTimer = true,
+        enablePandemic = true,
+        pandemicGlowType = plugin:GetSetting(1, "PandemicGlowType") or Constants.PandemicGlow.DefaultType,
+        pandemicGlowColor = plugin:GetSetting(1, "PandemicGlowColor") or Constants.PandemicGlow.DefaultColor,
     }
 
     -- Layout icons
@@ -702,6 +708,29 @@ function Plugin:AddSettings(dialog, systemFrame)
             { type = "slider", key = "MaxDebuffs", label = "Max Debuffs", min = 2, max = 8, step = 1, default = 4 },
         },
     }
+
+    -- Pandemic Glow Type
+    local GlowType = Orbit.Constants.PandemicGlow.Type
+    table.insert(schema.controls, {
+        type = "dropdown",
+        key = "PandemicGlowType",
+        label = "Pandemic Glow",
+        options = {
+            { text = "None", value = GlowType.None },
+            { text = "Pixel Glow", value = GlowType.Pixel },
+            { text = "Proc Glow", value = GlowType.Proc },
+            { text = "Autocast Shine", value = GlowType.Autocast },
+            { text = "Button Glow", value = GlowType.Button },
+        },
+        default = Orbit.Constants.PandemicGlow.DefaultType,
+    })
+
+    -- Pandemic Glow Color
+    WL:AddColorSettings(self, schema, systemIndex, systemFrame, {
+        key = "PandemicGlowColor",
+        label = "Pandemic Colour",
+        default = Orbit.Constants.PandemicGlow.DefaultColor,
+    }, nil)
 
     Orbit.Config:Render(dialog, systemFrame, self, schema)
 end

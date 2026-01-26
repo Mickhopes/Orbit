@@ -275,25 +275,25 @@ end
 -- [ STAGGER STATE (Brewmaster Monk) ]-----------------------------------------------------------
 
 --- Get stagger state for Brewmaster Monk
----@return number stagger Current stagger amount
----@return number maxHealth Max health for percentage calculation
----@return number percent Stagger as percentage of max health
----@return string level "LOW", "MEDIUM", or "HEAVY"
+---@return number stagger Current stagger amount (pass to StatusBar:SetValue)
+---@return number maxHealth Max health (pass to StatusBar:SetMinMaxValues)
+---@return string level "LOW", "MEDIUM", or "HEAVY" (based on C_UnitAuras stagger debuff index)
 function Mixin:GetStaggerState()
     local stagger = UnitStagger("player") or 0
     local maxHealth = UnitHealthMax("player") or 1
-    local percent = (stagger / maxHealth) * 100
 
-    local level
-    if percent < 30 then
-        level = "LOW"
-    elseif percent < 60 then
-        level = "MEDIUM"
-    else
+    local level = "LOW"
+    local staggerIndex = C_UnitAuras and C_UnitAuras.GetPlayerAuraBySpellID(124273) -- Heavy
+    if staggerIndex then
         level = "HEAVY"
+    else
+        staggerIndex = C_UnitAuras and C_UnitAuras.GetPlayerAuraBySpellID(124274) -- Moderate
+        if staggerIndex then
+            level = "MEDIUM"
+        end
     end
 
-    return stagger, maxHealth, percent, level
+    return stagger, maxHealth, level
 end
 
 -- [ SOUL FRAGMENTS STATE (Demon Hunter) ]-------------------------------------------------------

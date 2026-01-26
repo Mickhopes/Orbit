@@ -9,6 +9,21 @@ local Orbit = addonTable
 Orbit.AuraMixin = {}
 local Mixin = Orbit.AuraMixin
 
+-- LibCustomGlow for pandemic glows
+local LibCustomGlow = LibStub and LibStub("LibCustomGlow-1.0", true)
+
+-- Pandemic threshold curve: <30% remaining = 1 (show glow), >30% = 0 (hide)
+-- Created once at load time, reused for all icons
+local PANDEMIC_CURVE
+if C_CurveUtil and C_CurveUtil.CreateCurve then
+    PANDEMIC_CURVE = C_CurveUtil.CreateCurve()
+    PANDEMIC_CURVE:AddPoint(0.00, 0)    -- 0% remaining = don't show pandemics on passive effects.
+    PANDEMIC_CURVE:AddPoint(0.01, 1)    -- Pandemic all the way to 0
+    PANDEMIC_CURVE:AddPoint(0.30, 1)    -- ≤30% remaining = show glow
+    PANDEMIC_CURVE:AddPoint(0.301, 0)   -- >30% remaining = hide glow
+    PANDEMIC_CURVE:AddPoint(1.0, 0)
+end
+
 local DEFAULT_AURA_COUNT = 40
 local TOOLTIP_ANCHOR_THRESHOLD = 0.7
 
@@ -117,6 +132,11 @@ function Mixin:SetupAuraIcon(icon, aura, size, unit, skinSettings)
         Orbit.Skin.Icons:ApplyCustom(icon, skinSettings)
     end
 
+    -- Apply pandemic glow for player-applied buffs (if enabled in skinSettings)
+    if skinSettings and skinSettings.enablePandemic then
+        self:ApplyPandemicGlow(icon, aura, unit, skinSettings)
+    end
+
     icon:Show()
     return icon
 end
@@ -190,6 +210,205 @@ function Mixin:ApplyAuraCount(icon, aura, unit)
     -- No valid count or secret fallback - hide the count
     icon.count:SetText("")
     icon.count:Hide()
+end
+
+-- [ PANDEMIC GLOW ]---------------------------------------------------------------------------------
+-- Uses duration curve to detect if aura is in pandemic window (<30% remaining)
+-- Works with secret values by using EvaluateRemainingPercent + SetAlpha pattern
+-- Supports all glow types via skinSettings.pandemicGlowType and skinSettings.pandemicGlowColor
+
+function Mixin:ApplyPandemicGlow(icon, aura, unit, skinSettings)
+    if not icon or not aura then
+        return
+    end
+
+    -- Ensure LibCustomGlow is available
+    if not LibCustomGlow then
+        return
+    end
+
+    -- Ensure we have the curve and duration API available
+    if not PANDEMIC_CURVE or not C_UnitAuras or not C_UnitAuras.GetAuraDuration then
+        return
+    end
+
+    -- Need auraInstanceID for duration object
+    if not aura.auraInstanceID then
+        return
+    end
+
+    -- Get glow settings from skinSettings or use defaults
+    local GlowType = Orbit.Constants.PandemicGlow.Type
+    local GlowConfig = Orbit.Constants.PandemicGlow
+    
+    local glowType = (skinSettings and skinSettings.pandemicGlowType) or GlowConfig.DefaultType
+    local glowColor = (skinSettings and skinSettings.pandemicGlowColor) or GlowConfig.DefaultColor
+    
+    -- If glow type is None, stop any existing glow and return
+    if glowType == GlowType.None then
+        self:StopPandemicGlow(icon)
+        return
+    end
+    
+    local GLOW_KEY = "orbitPandemic"
+    local colorTable = { glowColor.r or 1, glowColor.g or 0.8, glowColor.b or 0, glowColor.a or 1 }
+
+    -- KEY FIX: If glow is already running with same type, just update aura references
+    -- This prevents animation restart on every UNIT_AURA update
+    if icon.orbitPandemicGlowActive == glowType then
+        -- Same glow type already running - just update aura data for OnUpdate
+        icon.orbitAura = aura
+        icon.orbitUnit = unit
+        icon.orbitPandemicAuraID = aura.auraInstanceID
+        return
+    end
+
+    -- Different glow type or no glow yet - need to start
+    -- Stop any existing glow first if type changed
+    if icon.orbitPandemicGlowActive then
+        self:StopPandemicGlow(icon)
+    end
+    
+    -- Store aura data on icon for OnUpdate
+    icon.orbitAura = aura
+    icon.orbitUnit = unit
+    icon.orbitPandemicAuraID = aura.auraInstanceID
+
+    -- Start the glow based on type (it will be controlled via alpha)
+    if glowType == GlowType.Pixel then
+        local cfg = GlowConfig.Pixel
+        LibCustomGlow.PixelGlow_Start(
+            icon,
+            colorTable,
+            cfg.Lines,
+            cfg.Frequency,
+            cfg.Length,
+            cfg.Thickness,
+            cfg.XOffset,
+            cfg.YOffset,
+            cfg.Border,
+            GLOW_KEY
+        )
+        icon.orbitPandemicGlowActive = GlowType.Pixel
+    elseif glowType == GlowType.Proc then
+        local cfg = GlowConfig.Proc
+        -- Calculate scale based on icon size vs standard 64px button
+        local iconWidth = icon:GetWidth() or 64
+        local scale = iconWidth / 64
+        LibCustomGlow.ProcGlow_Start(icon, {
+            color = colorTable,
+            startAnim = false, -- Disable start animation to avoid oversized flash
+            duration = cfg.Duration,
+            scale = scale,
+            key = GLOW_KEY,
+        })
+        icon.orbitPandemicGlowActive = GlowType.Proc
+    elseif glowType == GlowType.Autocast then
+        local cfg = GlowConfig.Autocast
+        LibCustomGlow.AutoCastGlow_Start(
+            icon,
+            colorTable,
+            cfg.Particles,
+            cfg.Frequency,
+            cfg.Scale,
+            cfg.XOffset,
+            cfg.YOffset,
+            GLOW_KEY
+        )
+        icon.orbitPandemicGlowActive = GlowType.Autocast
+    elseif glowType == GlowType.Button then
+        local cfg = GlowConfig.Button
+        LibCustomGlow.ButtonGlow_Start(icon, colorTable, cfg.Frequency, cfg.FrameLevel)
+        icon.orbitPandemicGlowActive = GlowType.Button
+    end
+
+    -- Get the glow frame that LibCustomGlow created
+    local glowFrame = icon["_PixelGlow" .. GLOW_KEY] 
+        or icon["_ProcGlow" .. GLOW_KEY] 
+        or icon["_AutoCastGlow" .. GLOW_KEY]
+        or icon["__ButtonGlow"]
+    
+    if glowFrame then
+        -- Initially hide the glow
+        glowFrame:SetAlpha(0)
+    end
+
+    -- Create controller frame for OnUpdate if not exists (reuse across updates)
+    if not icon.PandemicController then
+        icon.PandemicController = CreateFrame("Frame", nil, icon)
+        
+        -- OnUpdate handler to check pandemic state (only set once per icon)
+        local updateInterval = 0.1
+        local elapsed = 0
+
+        icon.PandemicController:SetScript("OnUpdate", function(self, dt)
+            elapsed = elapsed + dt
+            if elapsed < updateInterval then
+                return
+            end
+            elapsed = 0
+
+            local parentIcon = self:GetParent()
+            if not parentIcon.orbitAura or not parentIcon.orbitUnit then
+                return
+            end
+            
+            -- Get the appropriate glow frame
+            local glow = parentIcon["_PixelGlow" .. GLOW_KEY] 
+                or parentIcon["_ProcGlow" .. GLOW_KEY] 
+                or parentIcon["_AutoCastGlow" .. GLOW_KEY]
+                or parentIcon["__ButtonGlow"]
+            if not glow then
+                return
+            end
+
+            -- Get fresh duration object each update (auras can be refreshed)
+            local ok, durObj = pcall(C_UnitAuras.GetAuraDuration, parentIcon.orbitUnit, parentIcon.orbitAura.auraInstanceID)
+            if not ok or not durObj then
+                -- Aura gone - hide glow
+                glow:SetAlpha(0)
+                return
+            end
+
+            -- Evaluate remaining percent using our pandemic curve
+            -- Result is a secret number: 1 if <30% remaining (pandemic), 0 otherwise
+            -- We can pass this directly to SetAlpha (secret sink pattern)
+            local ok2, pandemicAlpha = pcall(durObj.EvaluateRemainingPercent, durObj, PANDEMIC_CURVE)
+            if ok2 and pandemicAlpha then
+                glow:SetAlpha(pandemicAlpha)
+            end
+        end)
+    end
+end
+
+-- Stop pandemic glow (all types)
+function Mixin:StopPandemicGlow(icon)
+    if not icon or not LibCustomGlow then
+        return
+    end
+    
+    local GLOW_KEY = "orbitPandemic"
+    
+    LibCustomGlow.PixelGlow_Stop(icon, GLOW_KEY)
+    LibCustomGlow.ProcGlow_Stop(icon, GLOW_KEY)
+    LibCustomGlow.AutoCastGlow_Stop(icon, GLOW_KEY)
+    LibCustomGlow.ButtonGlow_Stop(icon)
+    
+    icon.orbitPandemicGlowActive = nil
+end
+
+-- Cleanup pandemic glow when icon is released
+function Mixin:CleanupPandemicGlow(icon)
+    if not icon then
+        return
+    end
+
+    self:StopPandemicGlow(icon)
+    
+    icon.orbitAura = nil
+    icon.orbitUnit = nil
+    icon.orbitPandemicAuraID = nil
+    icon.orbitPandemicGlowType = nil
 end
 
 -- [ TOOLTIP SETUP ]---------------------------------------------------------------------------------

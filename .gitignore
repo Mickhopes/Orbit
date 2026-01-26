@@ -1,5 +1,4 @@
 .env
-.agent/
 .vscode/
 .scripts/
 Docs/

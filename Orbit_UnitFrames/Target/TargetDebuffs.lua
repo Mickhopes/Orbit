@@ -5,6 +5,8 @@ local OrbitEngine = Orbit.Engine
 local SYSTEM_ID = "Orbit_TargetDebuffs"
 local SYSTEM_INDEX = 1
 
+local Constants = Orbit.Constants
+
 local Plugin = Orbit:RegisterPlugin("Target Debuffs", SYSTEM_ID, {
     defaults = {
         IconsPerRow = 5,
@@ -12,6 +14,8 @@ local Plugin = Orbit:RegisterPlugin("Target Debuffs", SYSTEM_ID, {
         Spacing = 2,
         Width = 200,
         Scale = 100,
+        PandemicGlowType = Constants.PandemicGlow.DefaultType,
+        PandemicGlowColor = Constants.PandemicGlow.DefaultColor,
     },
 }, Orbit.Constants.PluginGroups.UnitFrames)
 
@@ -94,6 +98,29 @@ function Plugin:AddSettings(dialog, systemFrame)
             default = 100,
         })
     end
+
+    -- Pandemic Glow Type
+    local GlowType = Constants.PandemicGlow.Type
+    table.insert(schema.controls, {
+        type = "dropdown",
+        key = "PandemicGlowType",
+        label = "Pandemic Glow",
+        options = {
+            { text = "None", value = GlowType.None },
+            { text = "Pixel Glow", value = GlowType.Pixel },
+            { text = "Proc Glow", value = GlowType.Proc },
+            { text = "Autocast Shine", value = GlowType.Autocast },
+            { text = "Button Glow", value = GlowType.Button },
+        },
+        default = Constants.PandemicGlow.DefaultType,
+    })
+
+    -- Pandemic Glow Color
+    WL:AddColorSettings(self, schema, systemIndex, systemFrame, {
+        key = "PandemicGlowColor",
+        label = "Pandemic Colour",
+        default = Constants.PandemicGlow.DefaultColor,
+    }, nil)
 
     Orbit.Config:Render(dialog, systemFrame, self, schema)
 end
@@ -245,6 +272,9 @@ function Plugin:UpdateDebuffs()
         borderStyle = 1, -- Pixel Perfect
         borderSize = (Orbit.db and Orbit.db.GlobalSettings and Orbit.db.GlobalSettings.BorderSize) or 1,
         showTimer = true,
+        enablePandemic = true,
+        pandemicGlowType = self:GetSetting(SYSTEM_INDEX, "PandemicGlowType") or Constants.PandemicGlow.DefaultType,
+        pandemicGlowColor = self:GetSetting(SYSTEM_INDEX, "PandemicGlowColor") or Constants.PandemicGlow.DefaultColor,
     }
 
     local activeIcons = {}
