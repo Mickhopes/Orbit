@@ -244,7 +244,6 @@ function Plugin:ApplySettings()
     local height = self:GetSetting(systemIndex, "Height")
     local borderSize = self:GetSetting(systemIndex, "BorderSize")
     local textureName = self:GetSetting(systemIndex, "Texture")
-    local textSize = Orbit.Skin:GetAdaptiveTextSize(height, 12, 18, 1)
     local fontName = self:GetSetting(systemIndex, "Font")
 
     local isAnchored = OrbitEngine.Frame:GetAnchorParent(Frame) ~= nil
@@ -275,6 +274,19 @@ function Plugin:ApplySettings()
         Frame.Text:Hide()
     else
         Frame.Text:Show()
+
+        -- Check for Canvas Mode overrides for Font Size
+        local textSize = nil
+        local positions = self:GetSetting(systemIndex, "ComponentPositions")
+        if positions and positions.Text and positions.Text.overrides and positions.Text.overrides.FontSize then
+            textSize = positions.Text.overrides.FontSize
+        end
+
+        -- Fallback to adaptive size
+        if not textSize then
+            textSize = Orbit.Skin:GetAdaptiveTextSize(height, 12, 18, 1)
+        end
+
         local fontPath = LSM:Fetch("font", fontName)
         Frame.Text:SetFont(fontPath, textSize, "OUTLINE")
 

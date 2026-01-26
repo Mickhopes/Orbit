@@ -55,7 +55,7 @@ function Skin:SkinBorder(frame, backdrop, size, color, horizontal)
         return
     end
 
-    local targetSize = size
+    local targetSize = size or 1
 
     -- Handle Hidden/Zero Border
     if targetSize <= 0 then

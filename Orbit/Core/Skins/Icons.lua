@@ -606,7 +606,7 @@ function Icons:ApplyCustom(icon, settings)
         end
 
         local borderStyle = settings.borderStyle or 0
-        local borderSize = settings.borderSize
+        local borderSize = settings.borderSize or 1
 
         if r.border then
             if borderStyle == 1 then

@@ -76,14 +76,7 @@ Mixin(Plugin, Orbit.UnitFrameMixin, Orbit.PartyFramePreviewMixin, Orbit.AuraMixi
 -- Enable Canvas Mode (right-click component editing)
 Plugin.canvasMode = true
 
--- Helper to get global settings from Player Frame
-function Plugin:GetPlayerSetting(key)
-    local playerPlugin = Orbit:GetPlugin("Orbit_PlayerFrame")
-    if playerPlugin and playerPlugin.GetSetting then
-        return playerPlugin:GetSetting(1, key)
-    end
-    return nil
-end
+
 
 -- Check if a component is disabled (returns true if in DisabledComponents array)
 function Plugin:IsComponentDisabled(componentKey)
@@ -441,7 +434,7 @@ local function UpdateDebuffs(frame, plugin)
     end
 
     -- Skin settings
-    local globalBorder = plugin:GetPlayerSetting("BorderSize") or 1
+    local globalBorder = Orbit.db.GlobalSettings.BorderSize or 1
     local skinSettings = {
         zoom = 0,
         borderStyle = 1,
@@ -521,7 +514,7 @@ local function UpdateBuffs(frame, plugin)
     end
 
     -- Skin settings
-    local globalBorder = plugin:GetPlayerSetting("BorderSize") or 1
+    local globalBorder = Orbit.db.GlobalSettings.BorderSize or 1
     local skinSettings = {
         zoom = 0,
         borderStyle = 1,
@@ -643,7 +636,7 @@ local function CreatePartyFrame(partyIndex, plugin, unitOverride)
     frame:SetFrameStrata("MEDIUM")
     frame:SetFrameLevel(50 + partyIndex)
 
-    UpdateFrameLayout(frame, plugin:GetPlayerSetting("BorderSize"), plugin)
+    UpdateFrameLayout(frame, Orbit.db.GlobalSettings.BorderSize or 1, plugin)
 
     -- Create power bar
     frame.Power = CreatePowerBar(frame, unit, plugin)
@@ -669,7 +662,7 @@ local function CreatePartyFrame(partyIndex, plugin, unitOverride)
         
         self:UpdateAll()
         UpdatePowerBar(self, plugin)
-        UpdateFrameLayout(self, plugin:GetPlayerSetting("BorderSize"), plugin)
+        UpdateFrameLayout(self, Orbit.db.GlobalSettings.BorderSize or 1, plugin)
         UpdateDebuffs(self, plugin)
         UpdateBuffs(self, plugin)
         UpdateAllStatusIndicators(self, plugin)

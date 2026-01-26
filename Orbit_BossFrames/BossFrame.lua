@@ -31,6 +31,11 @@ local Plugin = Orbit:RegisterPlugin("Boss Frames", SYSTEM_ID, {
         PandemicGlowColor = Orbit.Constants.PandemicGlow.DefaultColor,
         -- Disabled components (Canvas Mode drag-to-disable)
         DisabledComponents = {},
+        -- Cast Bar Defaults (Decoupled from Player Cast Bar)
+        CastBarColor = { r = 1, g = 0.7, b = 0 },
+        NonInterruptibleColor = { r = 0.7, g = 0.7, b = 0.7 },
+        CastBarText = true,
+        CastBarTimer = true,
     },
 }, Orbit.Constants.PluginGroups.BossFrames)
 
@@ -48,23 +53,6 @@ function Plugin:IsComponentDisabled(componentKey)
     return false
 end
 
--- Helper to get global settings from Player Frame
-function Plugin:GetPlayerSetting(key)
-    local playerPlugin = Orbit:GetPlugin("Orbit_PlayerFrame")
-    if playerPlugin and playerPlugin.GetSetting then
-        return playerPlugin:GetSetting(1, key)
-    end
-    return nil
-end
-
--- Helper to get settings from Player Cast Bar
-function Plugin:GetCastBarSetting(key)
-    local castBarPlugin = Orbit:GetPlugin("Orbit_PlayerCastBar")
-    if castBarPlugin and castBarPlugin.GetSetting then
-        return castBarPlugin:GetSetting(1, key)
-    end
-    return nil
-end
 
 -- [ HELPERS ]---------------------------------------------------------------------------------------
 
@@ -225,7 +213,7 @@ local function UpdateDebuffs(frame, plugin)
     )
 
     -- Prepare Skin Settings
-    local globalBorder = plugin:GetPlayerSetting("BorderSize")
+    local globalBorder = Orbit.db.GlobalSettings.BorderSize or 1
     local Constants = Orbit.Constants
     local skinSettings = {
         zoom = 0, -- Inherit/Default
@@ -414,7 +402,7 @@ local function SetupCastBarHooks(castBar, unit)
         end
 
         -- Sync Text (repositioned based on icon)
-        local showText = plugin:GetCastBarSetting("CastBarText")
+        local showText = plugin:GetSetting(1, "CastBarText")
         if castBar.Text then
             castBar.Text:ClearAllPoints()
             if showText then
@@ -433,7 +421,7 @@ local function SetupCastBarHooks(castBar, unit)
         end
 
         -- Sync Timer Visibility
-        local showTimer = plugin:GetCastBarSetting("CastBarTimer")
+        local showTimer = plugin:GetSetting(1, "CastBarTimer")
         if castBar.Timer then
             castBar.Timer:SetShown(showTimer)
         end
@@ -447,10 +435,10 @@ local function SetupCastBarHooks(castBar, unit)
 
         -- Color based on interruptible
         if nativeBar.notInterruptible then
-            local color = plugin:GetCastBarSetting("NonInterruptibleColor") or { r = 0.7, g = 0.7, b = 0.7 }
+            local color = plugin:GetSetting(1, "NonInterruptibleColor") or { r = 0.7, g = 0.7, b = 0.7 }
             castBar:SetStatusBarColor(color.r, color.g, color.b)
         else
-            local color = plugin:GetCastBarSetting("CastBarColor") or { r = 1, g = 0.7, b = 0 }
+            local color = plugin:GetSetting(1, "CastBarColor") or { r = 1, g = 0.7, b = 0 }
             castBar:SetStatusBarColor(color.r, color.g, color.b)
         end
 
@@ -516,14 +504,14 @@ local function SetupCastBarHooks(castBar, unit)
             -- For now defaulting to red, or checking if InterruptedColor exists
             castBar:SetStatusBarColor(1, 0, 0)
         elseif event == "UNIT_SPELLCAST_NOT_INTERRUPTIBLE" then
-            local color = plugin:GetCastBarSetting("NonInterruptibleColor") or { r = 0.7, g = 0.7, b = 0.7 }
+            local color = plugin:GetSetting(1, "NonInterruptibleColor") or { r = 0.7, g = 0.7, b = 0.7 }
             castBar:SetStatusBarColor(color.r, color.g, color.b)
         elseif
             event == "UNIT_SPELLCAST_INTERRUPTIBLE"
             or event == "UNIT_SPELLCAST_START"
             or event == "UNIT_SPELLCAST_CHANNEL_START"
         then
-            local color = plugin:GetCastBarSetting("CastBarColor") or { r = 1, g = 0.7, b = 0 }
+            local color = plugin:GetSetting(1, "CastBarColor") or { r = 1, g = 0.7, b = 0 }
             castBar:SetStatusBarColor(color.r, color.g, color.b)
         end
     end)
@@ -550,7 +538,7 @@ local function CreateBossFrame(bossIndex, plugin)
     frame:SetFrameStrata("MEDIUM")
     frame:SetFrameLevel(50 + bossIndex)
 
-    UpdateFrameLayout(frame, plugin:GetPlayerSetting("BorderSize"))
+    UpdateFrameLayout(frame, Orbit.db.GlobalSettings.BorderSize or 1)
 
     -- Create power bar
     frame.Power = CreatePowerBar(frame, unit, plugin)
@@ -565,7 +553,7 @@ local function CreateBossFrame(bossIndex, plugin)
     frame:SetScript("OnShow", function(self)
         self:UpdateAll()
         UpdatePowerBar(self)
-        UpdateFrameLayout(self, plugin:GetPlayerSetting("BorderSize")) -- Ensure layout is correct on show
+        UpdateFrameLayout(self, Orbit.db.GlobalSettings.BorderSize or 1) -- Ensure layout is correct on show
         UpdateDebuffs(self, plugin)
     end)
 

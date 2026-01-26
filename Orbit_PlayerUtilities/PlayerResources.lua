@@ -384,11 +384,24 @@ function Plugin:ApplySettings()
     local fontPath = LSM:Fetch("font", fontName)
 
     -- Text (controlled via Canvas Mode)
+    -- Text (controlled via Canvas Mode)
     if OrbitEngine.ComponentDrag:IsDisabled(Frame.Text) then
         Frame.Text:Hide()
     else
         Frame.Text:Show()
-        local textSize = Orbit.Skin:GetAdaptiveTextSize(height, 18, 26, 1)
+
+        -- Check for Canvas Mode overrides for Font Size
+        local textSize = nil
+        local positions = self:GetSetting(systemIndex, "ComponentPositions")
+        if positions and positions.Text and positions.Text.overrides and positions.Text.overrides.FontSize then
+            textSize = positions.Text.overrides.FontSize
+        end
+
+        -- Fallback to adaptive size
+        if not textSize then
+            textSize = Orbit.Skin:GetAdaptiveTextSize(height, 18, 26, 1)
+        end
+
         Frame.Text:SetFont(fontPath, textSize, "OUTLINE")
 
         Frame.Text:ClearAllPoints()

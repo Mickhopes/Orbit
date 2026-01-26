@@ -339,8 +339,8 @@ function Plugin:ApplySettings(frame)
     -- Use Mixin for base settings
     -- inheritFromPlayer handles: Border, Texture, HealthTextEnabled
     -- Explicitly pass width/height to force inheritance (ignoring local overrides)
-    local width = self:GetPlayerSetting("Width")
-    local height = self:GetPlayerSetting("Height")
+    local width = self:GetSetting(systemIndex, "Width")
+    local height = self:GetSetting(systemIndex, "Height")
 
     self:ApplyUnitFrameSettings(frame, systemIndex, {
         inheritFromPlayer = true,
