@@ -282,7 +282,7 @@ function Orbit.BossFramePreviewMixin:ShowPreviewDebuffs(frame, numDebuffsToShow)
     )
 
     -- Settings for Skin
-    local globalBorder = self:GetPlayerSetting("BorderSize") or 1
+    local globalBorder = Orbit.db.GlobalSettings.BorderSize or 1
     local skinSettings = {
         zoom = 0,
         borderStyle = 1, -- Pixel Perfect
