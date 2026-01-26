@@ -31,15 +31,20 @@ local DEFAULT_BAR_COLOR = { r = 0.2, g = 0.6, b = 0.2 }
 --     barColor: fallback bar color {r, g, b}
 -- }
 -- @return preview frame with metadata
-function PreviewFrame:Create(sourceFrame, options)
+-- [ HELPER: BASE PREVIEW ] ————————————————————————————————————————————————————————————————
+
+-- Create a generic preview container with standard Orbit styling
+-- @param sourceFrame: Frame being replicated
+-- @param scale: Scale factor (default 1.0)
+-- @param parent: Parent frame
+-- @param borderSize: Border thickness (default 2)
+function PreviewFrame:CreateBasePreview(sourceFrame, scale, parent, borderSize)
     if not sourceFrame then return nil end
     
-    options = options or {}
-    local scale = options.scale or DEFAULT_SCALE
-    local parent = options.parent or UIParent
-    local borderSize = options.borderSize or DEFAULT_BORDER_SIZE
+    scale = scale or DEFAULT_SCALE
+    parent = parent or UIParent
+    borderSize = borderSize or DEFAULT_BORDER_SIZE
     
-    -- Get source dimensions
     local sourceWidth = sourceFrame:GetWidth()
     local sourceHeight = sourceFrame:GetHeight()
     
@@ -52,9 +57,9 @@ function PreviewFrame:Create(sourceFrame, options)
     preview.sourceWidth = sourceWidth
     preview.sourceHeight = sourceHeight
     preview.previewScale = scale
-    preview.components = {}  -- { key = container }
+    preview.components = {}
     
-    -- Apply backdrop (Orbit style - dark background with solid border)
+    -- Apply standard Orbit backdrop
     local bgColor = Orbit.Constants and Orbit.Constants.Colors and Orbit.Constants.Colors.Background
         or { r = 0.1, g = 0.1, b = 0.1, a = 0.95 }
     
@@ -67,37 +72,45 @@ function PreviewFrame:Create(sourceFrame, options)
     preview:SetBackdropColor(bgColor.r, bgColor.g, bgColor.b, bgColor.a or 0.95)
     preview:SetBackdropBorderColor(0, 0, 0, 1)
     
-    -- Create health bar visual
-    local bar = CreateFrame("StatusBar", nil, preview)
-    local inset = borderSize * scale
-    bar:SetPoint("TOPLEFT", preview, "TOPLEFT", inset, -inset)
-    bar:SetPoint("BOTTOMRIGHT", preview, "BOTTOMRIGHT", -inset, inset)
-    bar:SetMinMaxValues(0, 1)
-    bar:SetValue(1)
-    
-    -- Apply texture
-    local texturePath = "Interface\\Buttons\\WHITE8x8"
-    if options.textureName and LSM then
-        texturePath = LSM:Fetch("statusbar", options.textureName) or texturePath
-    end
-    bar:SetStatusBarTexture(texturePath)
-    
-    -- Apply color
-    local barColor = options.barColor or DEFAULT_BAR_COLOR
-    if options.useClassColor then
-        local classColor = RAID_CLASS_COLORS[select(2, UnitClass("player"))]
-        if classColor then
-            bar:SetStatusBarColor(classColor.r, classColor.g, classColor.b, 1)
-        else
-            bar:SetStatusBarColor(barColor.r, barColor.g, barColor.b, 1)
-        end
-    else
-        bar:SetStatusBarColor(barColor.r, barColor.g, barColor.b, 0.8)
-    end
-    
-    preview.Health = bar
-    
     return preview
+end
+
+-- [ CREATE PREVIEW ]————————————————————————————————————————————————————————————————————————————
+
+-- Create a scaled preview frame that replicates the source frame's appearance
+-- @param sourceFrame: The frame to replicate
+-- @param options: { ... }
+-- @return preview frame with metadata
+function PreviewFrame:Create(sourceFrame, options)
+    if not sourceFrame then return nil end
+    
+    options = options or {}
+    local scale = options.scale or DEFAULT_SCALE
+    local parent = options.parent or UIParent
+    local borderSize = options.borderSize or DEFAULT_BORDER_SIZE
+    
+    -- [ HOOK: CUSTOM PREVIEW ] -------------------------------------------------------------------
+    if sourceFrame.CreateCanvasPreview then
+        local preview = sourceFrame:CreateCanvasPreview(options)
+        if preview then
+            -- Ensure minimal metadata if the hook didn't set it (safety)
+            if not preview.sourceFrame then
+                preview.sourceFrame = sourceFrame
+                preview.sourceWidth = sourceFrame:GetWidth()
+                preview.sourceHeight = sourceFrame:GetHeight()
+                preview.previewScale = scale
+                preview.components = preview.components or {}
+            end
+            
+            if preview:GetParent() ~= parent then
+                preview:SetParent(parent)
+            end
+            return preview
+        end
+    end
+    
+    -- [ FALLBACK: GENERIC CONTAINER ] -----------------------------------------------------------
+    return self:CreateBasePreview(sourceFrame, scale, parent, borderSize)
 end
 
 -- [ DESTROY PREVIEW ]---------------------------------------------------------------------------

@@ -10,5 +10,6 @@ local mediaPath = "Interface\\AddOns\\" .. addonName .. "\\Core\\assets\\"
 -- Fonts
 LSM:Register("font", "Archivo Narrow Bold", mediaPath .. "Fonts\\ArchivoNarrow-Bold.ttf")
 LSM:Register("font", "PT Sans Narrow", mediaPath .. "Fonts\\PTSansNarrow.ttf")
+LSM:Register("font", "Luckiest Guy", mediaPath .. "Fonts\\LuckiestGuy-Regular.ttf")
 
 -- Statusbars

@@ -85,6 +85,43 @@ function Plugin:OnLoad()
         anchorOptions = { horizontal = false, vertical = true, mergeBorders = true }, -- Vertical stacking only, merge borders
     })
 
+    -- [ CANVAS PREVIEW ] -------------------------------------------------------------------------------
+    function Frame:CreateCanvasPreview(options)
+        local scale = options.scale or 1
+        local borderSize = options.borderSize or 1
+        
+        -- Base container
+        local preview = OrbitEngine.Preview.Frame:CreateBasePreview(self, scale, options.parent, borderSize)
+        
+        -- Create Power Bar visual
+        local bar = CreateFrame("StatusBar", nil, preview)
+        local inset = borderSize * scale
+        bar:SetPoint("TOPLEFT", preview, "TOPLEFT", inset, -inset)
+        bar:SetPoint("BOTTOMRIGHT", preview, "BOTTOMRIGHT", -inset, inset)
+        bar:SetMinMaxValues(0, 1)
+        bar:SetValue(1)
+        
+        -- Appearance
+        local textureName = Plugin:GetSetting(SYSTEM_INDEX, "Texture")
+        local texturePath = "Interface\\Buttons\\WHITE8x8"
+        if textureName and LSM then
+            texturePath = LSM:Fetch("statusbar", textureName) or texturePath
+        end
+        bar:SetStatusBarTexture(texturePath)
+        
+        -- Color
+        -- Default to Mana blue for focus preview since we don't have a unit
+        local info = Orbit.Constants.Colors.PowerType[0] -- Mana
+        if info then
+            bar:SetStatusBarColor(info.r, info.g, info.b)
+        else
+            bar:SetStatusBarColor(0, 0.5, 1)
+        end
+        
+        preview.PowerBar = bar
+        return preview
+    end
+
     -- Text overlay
     OrbitEngine.FrameFactory:AddText(
         Frame,

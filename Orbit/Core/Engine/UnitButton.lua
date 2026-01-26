@@ -26,6 +26,48 @@ function UnitButtonMixin:OnLoad()
     self:UpdateAll()
 end
 
+function UnitButtonMixin:CreateCanvasPreview(options)
+    options = options or {}
+    local scale = options.scale or 1
+    local borderSize = options.borderSize or 2
+    
+    -- Create generic container with standard Orbit backdrop/style
+    -- This handles frame creation, sizing, metadata, and backdrop
+    local preview = Engine.Preview.Frame:CreateBasePreview(self, scale, options.parent, borderSize)
+    
+    -- Create health bar visual (UnitButton specific)
+    local bar = CreateFrame("StatusBar", nil, preview)
+    local inset = borderSize * scale
+    bar:SetPoint("TOPLEFT", preview, "TOPLEFT", inset, -inset)
+    bar:SetPoint("BOTTOMRIGHT", preview, "BOTTOMRIGHT", -inset, inset)
+    bar:SetMinMaxValues(0, 1)
+    bar:SetValue(1)
+    
+    -- Apply texture
+    local texturePath = "Interface\\Buttons\\WHITE8x8"
+    if options.textureName and LSM then
+        texturePath = LSM:Fetch("statusbar", options.textureName) or texturePath
+    end
+    bar:SetStatusBarTexture(texturePath)
+    
+    -- Apply color
+    local barColor = options.barColor or { r = 0.2, g = 0.6, b = 0.2 }
+    if options.useClassColor then
+        local classColor = RAID_CLASS_COLORS[select(2, UnitClass("player"))]
+        if classColor then
+            bar:SetStatusBarColor(classColor.r, classColor.g, classColor.b, 1)
+        else
+            bar:SetStatusBarColor(barColor.r, barColor.g, barColor.b, 1)
+        end
+    else
+        bar:SetStatusBarColor(barColor.r, barColor.g, barColor.b, 0.8)
+    end
+    
+    preview.Health = bar
+    
+    return preview
+end
+
 function UnitButtonMixin:OnEvent(event, unit)
     if unit and unit ~= self.unit then
         return

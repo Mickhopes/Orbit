@@ -288,6 +288,8 @@ function Dialog:Open(frame, plugin, systemIndex)
         borderSize = borderSize,
         textureName = textureName,
         useClassColor = true,
+        plugin = plugin,               -- Pass plugin for custom hooks
+        systemIndex = systemIndex,     -- Pass system index for custom hooks
     })
     self.previewFrame:SetPoint("CENTER", self.TransformLayer, "CENTER", 0, 0)
     

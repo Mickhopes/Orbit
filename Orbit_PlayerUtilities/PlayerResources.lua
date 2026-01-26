@@ -119,6 +119,78 @@ function Plugin:OnLoad()
     })
     self.frame = Frame  -- Expose for PluginMixin compatibility
 
+    -- [ CANVAS PREVIEW ] -------------------------------------------------------------------------------
+    function Frame:CreateCanvasPreview(options)
+        local scale = options.scale or 1
+        local borderSize = options.borderSize or 1
+        
+        -- Base container
+        local preview = OrbitEngine.Preview.Frame:CreateBasePreview(self, scale, options.parent, borderSize)
+        
+        -- Generate representative buttons (e.g. 5 combo points)
+        local buttonCount = 5
+        local textureName = Plugin:GetSetting(SYSTEM_INDEX, "Texture")
+        local spacing = borderSize * scale
+        local totalSpacing = (buttonCount - 1) * spacing
+        
+        -- Calculate dimensions inside the border
+        local totalWidth = preview:GetWidth()
+        local height = preview:GetHeight()
+        local btnWidth = (totalWidth - totalSpacing) / buttonCount
+        
+        -- Texture path
+        local texturePath = "Interface\\Buttons\\WHITE8x8"
+        if textureName and LSM then
+            texturePath = LSM:Fetch("statusbar", textureName) or texturePath
+        end
+        
+        -- Get Class Color
+        local _, class = UnitClass("player")
+        local color = Orbit.Colors.PlayerResources[class] or { r=1, g=0.8, b=0 }
+        
+        -- Create dummy buttons
+        for i = 1, buttonCount do
+            local btn = CreateFrame("Frame", nil, preview, "BackdropTemplate")
+            btn:SetSize(btnWidth, height)
+            
+            -- Position
+            if i == 1 then
+                btn:SetPoint("LEFT", preview, "LEFT", 0, 0)
+            else
+                btn:SetPoint("LEFT", preview.buttons[i-1], "RIGHT", spacing, 0)
+            end
+            
+            -- Skin it
+            local bar = btn:CreateTexture(nil, "ARTWORK")
+            bar:SetAllPoints()
+            bar:SetTexture(texturePath)
+            bar:SetVertexColor(color.r, color.g, color.b)
+            
+            -- Border
+            if Orbit.Skin and Orbit.Skin.ClassBar then
+                -- Simplified border simulation if needed, or just rely on the texture
+                -- Since CreateBasePreview adds a container border, usually buttons just need fill
+                -- But if we want individual button borders:
+                btn:SetBackdrop({
+                    edgeFile = "Interface\\Buttons\\WHITE8x8",
+                    edgeSize = borderSize * scale,
+                })
+                btn:SetBackdropBorderColor(0, 0, 0, 1)
+                
+                -- Inset the bar to show border
+                local inset = borderSize * scale
+                bar:ClearAllPoints()
+                bar:SetPoint("TOPLEFT", inset, -inset)
+                bar:SetPoint("BOTTOMRIGHT", -inset, inset)
+            end
+            
+            if not preview.buttons then preview.buttons = {} end
+            preview.buttons[i] = btn
+        end
+        
+        return preview
+    end
+
     -- Text overlay (must be on a high frame level to be above buttons)
     if not Frame.Overlay then
         Frame.Overlay = CreateFrame("Frame", nil, Frame)
