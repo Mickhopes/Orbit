@@ -24,19 +24,12 @@ local Plugin = Orbit:RegisterPlugin("Cooldown Manager", "Orbit_CooldownViewer", 
         Opacity = 100,
         Orientation = 0,
         IconLimit = Constants.Cooldown.DefaultLimit,
-        ShowTimer = true,
-        HideGCDSwipe = true,
+        ShowGCDSwipe = true,
         -- Glow Settings (use PandemicGlow constants for consistency)
         PandemicGlowType = Constants.PandemicGlow.DefaultType,
         PandemicGlowColor = Constants.PandemicGlow.DefaultColor,
         ProcGlowType = Constants.PandemicGlow.DefaultType,
         ProcGlowColor = Constants.PandemicGlow.DefaultColor,
-        -- Text Customization
-        ShowKeybinds = false,
-        TimerSizeOffset = 0,
-        ChargesSizeOffset = 0,
-        StacksSizeOffset = 0,
-        KeybindSizeOffset = 0,
     },
 }, Orbit.Constants.PluginGroups.CooldownManager)
 
@@ -138,19 +131,11 @@ function Plugin:AddSettings(dialog, systemFrame)
         default = { r = 0, g = 0, b = 0, a = 0.8 },
     }, nil)
 
-    -- 8. Show Timer
+    -- 8. Show GCD Swipe
     table.insert(schema.controls, {
         type = "checkbox",
-        key = "ShowTimer",
-        label = "Show Timer",
-        default = true,
-    })
-
-    -- 9. Hide GCD Swipe
-    table.insert(schema.controls, {
-        type = "checkbox",
-        key = "HideGCDSwipe",
-        label = "Hide GCD Swipe",
+        key = "ShowGCDSwipe",
+        label = "Show GCD Swipe",
         default = true,
     })
 
@@ -199,60 +184,7 @@ function Plugin:AddSettings(dialog, systemFrame)
         default = Constants.PandemicGlow.DefaultColor,
     }, nil)
 
-    -- Text Customization Header
-    table.insert(schema.controls, { type = "header", text = "Text Settings" })
 
-    -- Show Keybinds
-    table.insert(schema.controls, {
-        type = "checkbox",
-        key = "ShowKeybinds",
-        label = "Show Keybinds",
-        default = false,
-    })
-
-    -- Timer Size Offset
-    table.insert(schema.controls, {
-        type = "slider",
-        key = "TimerSizeOffset",
-        label = "Timer Size",
-        min = -4,
-        max = 4,
-        step = 1,
-        default = 0,
-    })
-
-    -- Charges Size Offset
-    table.insert(schema.controls, {
-        type = "slider",
-        key = "ChargesSizeOffset",
-        label = "Charges Size",
-        min = -4,
-        max = 4,
-        step = 1,
-        default = 0,
-    })
-
-    -- Stacks Size Offset (for BuffIcon)
-    table.insert(schema.controls, {
-        type = "slider",
-        key = "StacksSizeOffset",
-        label = "Stacks Size",
-        min = -4,
-        max = 4,
-        step = 1,
-        default = 0,
-    })
-
-    -- Keybind Size Offset
-    table.insert(schema.controls, {
-        type = "slider",
-        key = "KeybindSizeOffset",
-        label = "Keybind Size",
-        min = -4,
-        max = 4,
-        step = 1,
-        default = 0,
-    })
 
     Orbit.Config:Render(dialog, systemFrame, self, schema)
 end
@@ -1050,7 +982,7 @@ function Plugin:ProcessChildren(anchor)
             padding = self:GetSetting(systemIndex, "IconPadding"),
             size = self:GetSetting(systemIndex, "IconSize"),
             showTimer = self:GetSetting(systemIndex, "ShowTimer"),
-            hideGCDSwipe = self:GetSetting(systemIndex, "HideGCDSwipe"),
+            showGCDSwipe = self:GetSetting(systemIndex, "ShowGCDSwipe"),
             baseIconSize = Constants.Skin.DefaultIconSize, -- 40x40 consistent base for all viewers
             backdropColor = self:GetSetting(systemIndex, "BackdropColour"),
             showTooltip = false,
@@ -1080,8 +1012,8 @@ function Plugin:ProcessChildren(anchor)
                     local sysIdx = self.orbitSystemIndex
                     if not plugin or not sysIdx then return end
                     
-                    local hideGCD = plugin:GetSetting(sysIdx, "HideGCDSwipe")
-                    if hideGCD == false then return end  -- Setting is OFF, don't hide
+                    local showGCD = plugin:GetSetting(sysIdx, "ShowGCDSwipe")
+                    if showGCD then return end  -- Setting is ON, show swipe normally
                     
                     -- Fix: Do not hide if the swipe is actually coming from an Aura (e.g. debuff on target)
                     if self.isOnGCD and not self.wasSetFromAura then
@@ -1139,52 +1071,7 @@ function Plugin:GetGlobalFont()
     return STANDARD_TEXT_FONT
 end
 
-function Plugin:GetSpellKeybind(spellID)
-    if not spellID then return nil end
-    
-    -- Wrap in pcall because C_ActionBar.FindSpellActionButtons can return secret values
-    -- in combat that error when using length operator or arithmetic
-    local success, result = pcall(function()
-        local slots = C_ActionBar.FindSpellActionButtons(spellID)
-        if not slots then return nil end
-        
-        -- Use next() to check for empty table (avoids # on secret)
-        local slot = slots[1]
-        if not slot then return nil end
-        
-        local page = math.floor((slot - 1) / 12) + 1
-        local buttonIndex = ((slot - 1) % 12) + 1
-        
-        -- Determine binding name based on bar/page
-        local bindingName
-        if page == 1 then
-            bindingName = "ACTIONBUTTON" .. buttonIndex
-        elseif page == 2 then
-            bindingName = "MULTIACTIONBAR1BUTTON" .. buttonIndex
-        elseif page == 3 then
-            bindingName = "MULTIACTIONBAR2BUTTON" .. buttonIndex
-        elseif page == 4 then
-            bindingName = "MULTIACTIONBAR3BUTTON" .. buttonIndex
-        elseif page == 5 then
-            bindingName = "MULTIACTIONBAR4BUTTON" .. buttonIndex
-        else
-            -- Fallback for additional bars
-            bindingName = "ACTIONBUTTON" .. buttonIndex
-        end
-        
-        local key = GetBindingKey(bindingName)
-        if key then
-            return GetBindingText(key, true) -- 'true' = abbreviated format
-        end
-        return nil
-    end)
-    
-    if success then
-        return result
-    end
-    -- If secret value error occurred, just return nil silently
-    return nil
-end
+-- NOTE: Keybind system is defined in KeybindSystem.lua (Plugin:GetSpellKeybind)
 
 -- Get or create a high-level text overlay frame for the icon
 -- This ensures text is always above glow effects, swipe, and borders
@@ -1227,8 +1114,7 @@ function Plugin:ApplyTextSettings(icon, systemIndex)
             font = LSM:Fetch("font", overrides.Font) or fontPath
         end
         
-        local sizeOffset = self:GetSetting(systemIndex, key .. "SizeOffset") or 0
-        local size = overrides.FontSize or math.max(6, baseSize + sizeOffset + (defaultOffset or 0))
+        local size = overrides.FontSize or math.max(6, baseSize + (defaultOffset or 0))
         
         local flags = "OUTLINE"
         if overrides.ShowShadow then
@@ -1407,12 +1293,8 @@ function Plugin:ApplyTextSettings(icon, systemIndex)
         end
     end
     
-    -- Keybind display
-    local showKeybinds = self:GetSetting(systemIndex, "ShowKeybinds")
-    -- Also check if keybind is disabled via Canvas Mode
-    if self:IsComponentDisabled("Keybind", systemIndex) then
-        showKeybinds = false
-    end
+    -- Keybind display (show unless disabled via Canvas Mode)
+    local showKeybinds = not self:IsComponentDisabled("Keybind", systemIndex)
     local keybindFont, keybindSize, keybindFlags, keybindPos = GetComponentStyle("Keybind", -2)
     
     if showKeybinds then
@@ -1439,8 +1321,9 @@ function Plugin:ApplyTextSettings(icon, systemIndex)
         end
         
         -- Get spell ID from the icon
+        -- NOTE: GetSpellKeybind is defined in KeybindSystem.lua which loads after CooldownManager.lua
         local spellID = icon.GetSpellID and icon:GetSpellID()
-        local keyText = self:GetSpellKeybind(spellID)
+        local keyText = self.GetSpellKeybind and self:GetSpellKeybind(spellID)
         
         if keyText then
             keybind:SetText(keyText)

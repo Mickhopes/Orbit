@@ -105,17 +105,17 @@ local function CreateDraggableComponent(preview, key, sourceComponent, startX, s
         local sx, sy = sourceComponent:GetShadowOffset()
         if sx then visual:SetShadowOffset(sx, sy) end
         
-        -- Auto-size container
+        -- Auto-size container (zero padding for precise hitbox)
         local textWidth, textHeight = 60, 16
         local ok, w = pcall(function() return visual:GetStringWidth() end)
         if ok and w and type(w) == "number" and (not issecretvalue or not issecretvalue(w)) then
-            textWidth = w + 10
+            textWidth = w
         end
         local ok2, h = pcall(function() return visual:GetStringHeight() end)
         if ok2 and h and type(h) == "number" and (not issecretvalue or not issecretvalue(h)) then
-            textHeight = h + 6
+            textHeight = h
         end
-        container:SetSize(math.max(20, textWidth), math.max(18, textHeight))
+        container:SetSize(math.max(20, textWidth), math.max(14, textHeight))
         
         visual:SetPoint("CENTER", container, "CENTER", 0, 0)
         container.isFontString = true
@@ -350,29 +350,27 @@ local function CreateDraggableComponent(preview, key, sourceComponent, startX, s
             
             local anchorX, anchorY, edgeOffX, edgeOffY, justifyH = CalculateAnchor(centerRelX, centerRelY, halfW, halfH)
             
-            -- FontString justify calculation
+            -- FontString justify calculation (bare edge offsets - no containerW adjustment)
             if self.isFontString then
-                local containerW = self:GetWidth()
                 local isOutsideLeft = centerRelX < -halfW
                 local isOutsideRight = centerRelX > halfW
                 
                 if anchorX == "LEFT" then
                     justifyH = isOutsideLeft and "RIGHT" or "LEFT"
-                    if justifyH == "LEFT" then
-                        edgeOffX = centerRelX + halfW - containerW / 2
-                    else
-                        edgeOffX = centerRelX + halfW + containerW / 2
-                    end
+                    -- Bare offset: distance from left edge to cursor center
+                    edgeOffX = centerRelX + halfW
                 elseif anchorX == "RIGHT" then
                     justifyH = isOutsideRight and "LEFT" or "RIGHT"
-                    if justifyH == "RIGHT" then
-                        edgeOffX = halfW - centerRelX - containerW / 2
-                    else
-                        edgeOffX = halfW - centerRelX + containerW / 2
-                    end
+                    -- Bare offset: distance from right edge to cursor center
+                    edgeOffX = halfW - centerRelX
                 else
                     edgeOffX = 0
                     justifyH = "CENTER"
+                end
+                
+                -- Live text alignment during drag (what you see = what you get)
+                if self.visual then
+                    ApplyTextAlignment(self, self.visual, justifyH)
                 end
             end
             

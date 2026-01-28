@@ -556,27 +556,72 @@ function Dialog:ResetPositions()
     
     -- Restore disabled components from dock
     local dragComponents = OrbitEngine.ComponentDrag:GetComponentsForFrame(self.targetFrame)
-    if dragComponents then
-        for key, _ in pairs(self.dockComponents) do
+    for key, dockIcon in pairs(self.dockComponents) do
+        local defaultPos = defaults[key]
+        local centerX, centerY = 0, 0
+        
+        if defaultPos and defaultPos.anchorX then
+            if defaultPos.anchorX == "LEFT" then
+                centerX = (defaultPos.offsetX or 0) - halfW
+            elseif defaultPos.anchorX == "RIGHT" then
+                centerX = halfW - (defaultPos.offsetX or 0)
+            end
+            
+            if defaultPos.anchorY == "BOTTOM" then
+                centerY = (defaultPos.offsetY or 0) - halfH
+            elseif defaultPos.anchorY == "TOP" then
+                centerY = halfH - (defaultPos.offsetY or 0)
+            end
+        end
+        
+        -- Check for CDM path: use storedDraggableComp if available
+        if dockIcon.storedDraggableComp then
+            local storedComp = dockIcon.storedDraggableComp
+            storedComp:Show()
+            
+            -- Reset position to default
+            storedComp.anchorX = defaultPos and defaultPos.anchorX or "CENTER"
+            storedComp.anchorY = defaultPos and defaultPos.anchorY or "CENTER"
+            storedComp.offsetX = defaultPos and defaultPos.offsetX or 0
+            storedComp.offsetY = defaultPos and defaultPos.offsetY or 0
+            storedComp.justifyH = defaultPos and defaultPos.justifyH or "CENTER"
+            storedComp.posX = centerX
+            storedComp.posY = centerY
+            storedComp.pendingOverrides = nil
+            storedComp.existingOverrides = nil
+            
+            -- Reposition
+            local anchorPoint = BuildAnchorPoint(storedComp.anchorX, storedComp.anchorY)
+            local finalX, finalY
+            if storedComp.anchorX == "CENTER" then
+                finalX = centerX
+            else
+                finalX = storedComp.offsetX
+                if storedComp.anchorX == "RIGHT" then finalX = -finalX end
+            end
+            if storedComp.anchorY == "CENTER" then
+                finalY = centerY
+            else
+                finalY = storedComp.offsetY
+                if storedComp.anchorY == "TOP" then finalY = -finalY end
+            end
+            
+            storedComp:ClearAllPoints()
+            if storedComp.isFontString and storedComp.justifyH ~= "CENTER" then
+                storedComp:SetPoint(storedComp.justifyH, preview, anchorPoint, finalX, finalY)
+            else
+                storedComp:SetPoint("CENTER", preview, anchorPoint, finalX, finalY)
+            end
+            
+            if storedComp.visual and storedComp.isFontString then
+                ApplyTextAlignment(storedComp, storedComp.visual, storedComp.justifyH)
+            end
+            
+            self.previewComponents[key] = storedComp
+        elseif dragComponents then
+            -- Fallback: use ComponentDrag path
             local data = dragComponents[key]
             if data and data.component then
-                local defaultPos = defaults[key]
-                local centerX, centerY = 0, 0
-                
-                if defaultPos and defaultPos.anchorX then
-                    if defaultPos.anchorX == "LEFT" then
-                        centerX = (defaultPos.offsetX or 0) - halfW
-                    elseif defaultPos.anchorX == "RIGHT" then
-                        centerX = halfW - (defaultPos.offsetX or 0)
-                    end
-                    
-                    if defaultPos.anchorY == "BOTTOM" then
-                        centerY = (defaultPos.offsetY or 0) - halfH
-                    elseif defaultPos.anchorY == "TOP" then
-                        centerY = halfH - (defaultPos.offsetY or 0)
-                    end
-                end
-                
                 local compData = {
                     component = data.component,
                     x = centerX,
