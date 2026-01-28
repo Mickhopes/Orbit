@@ -318,22 +318,39 @@ function Plugin:CreateAnchor(name, systemIndex, label)
     return frame
 end
 
+-- Check if a component is disabled via Canvas Mode drag-to-disable feature
+-- CDM-specific version that accepts systemIndex since we have multiple anchors
+function Plugin:IsComponentDisabled(componentKey, systemIndex)
+    systemIndex = systemIndex or 1
+    local disabled = self:GetSetting(systemIndex, "DisabledComponents") or {}
+    for _, key in ipairs(disabled) do
+        if key == componentKey then
+            return true
+        end
+    end
+    return false
+end
+
 -- [ CANVAS MODE PREVIEW ]-----------------------------------------------------------------------
 -- Creates a single-icon preview for Canvas Mode that matches exact icon dimensions
 function Plugin:SetupCanvasPreview(anchor, systemIndex)
     local plugin = self
+    local LSM = LibStub("LibSharedMedia-3.0")
     
     anchor.CreateCanvasPreview = function(self, options)
         local entry = VIEWER_MAP[systemIndex]
         if not entry or not entry.viewer then return nil end
         
         -- Get icon dimensions from settings
+        -- NOTE: We use the UNSCALED base dimensions because:
+        -- - Real icons are sized at baseSize with aspect ratio (e.g., 40x40)
+        -- - The anchor frame's SetScale(iconSize/100) handles visual scaling
+        -- - Text positions are relative to the icon's unscaled dimensions
+        -- - If we used scaled preview, positions would be off by the scale factor
         local aspectRatio = plugin:GetSetting(systemIndex, "aspectRatio") or "1:1"
-        local iconSize = plugin:GetSetting(systemIndex, "IconSize") or 100
         local baseSize = Constants.Skin.DefaultIconSize or 40
-        local scale = iconSize / 100
         
-        -- Calculate dimensions from aspect ratio
+        -- Calculate dimensions from aspect ratio (unscaled)
         local w, h = baseSize, baseSize
         if aspectRatio == "16:9" then
             h = baseSize * (9/16)
@@ -342,7 +359,7 @@ function Plugin:SetupCanvasPreview(anchor, systemIndex)
         elseif aspectRatio == "21:9" then
             h = baseSize * (9/21)
         end
-        w, h = w * scale, h * scale
+        -- NOTE: Intentionally NOT scaling by iconSize/100 - see comment above
         
         -- Create preview matching single icon size
         local parent = options.parent or UIParent
@@ -385,6 +402,81 @@ function Plugin:SetupCanvasPreview(anchor, systemIndex)
         })
         preview:SetBackdropColor(0, 0, 0, 0)
         preview:SetBackdropBorderColor(0, 0, 0, 1)
+        
+        -- [ TEXT COMPONENTS ]------------------------------------------------------------
+        -- Add draggable text labels for Timer, Charges, Stacks, Keybind
+        
+        local savedPositions = plugin:GetSetting(systemIndex, "ComponentPositions") or {}
+        
+        -- Get global font settings
+        local globalFontName = Orbit.db and Orbit.db.GlobalSettings and Orbit.db.GlobalSettings.Font
+        local fontPath = LSM:Fetch("font", globalFontName) or "Fonts\\FRIZQT__.TTF"
+        
+        -- Text component definitions with defaults
+        local textComponents = {
+            { key = "Timer", preview = string.format("%.1f", 3 + math.random() * 7), anchorX = "CENTER", anchorY = "CENTER", offsetX = 0, offsetY = 0 },
+            { key = "Charges", preview = "2", anchorX = "RIGHT", anchorY = "BOTTOM", offsetX = 2, offsetY = 2 },
+            { key = "Stacks", preview = "3", anchorX = "LEFT", anchorY = "BOTTOM", offsetX = 2, offsetY = 2 },
+            { key = "Keybind", preview = "1", anchorX = "RIGHT", anchorY = "TOP", offsetX = 2, offsetY = 2 },
+        }
+        
+        local CreateDraggableComponent = OrbitEngine.CanvasMode and OrbitEngine.CanvasMode.CreateDraggableComponent
+        
+        for _, def in ipairs(textComponents) do
+            -- Create temporary FontString as source for cloning
+            local fs = preview:CreateFontString(nil, "OVERLAY", nil, 7)  -- Highest sublevel
+            fs:SetFont(fontPath, 12, "OUTLINE")
+            fs:SetText(def.preview)
+            fs:SetTextColor(1, 1, 1, 1)
+            fs:SetPoint("CENTER", preview, "CENTER", 0, 0)
+            
+            -- Get saved position or use defaults
+            local saved = savedPositions[def.key] or {}
+            local data = {
+                anchorX = saved.anchorX or def.anchorX,
+                anchorY = saved.anchorY or def.anchorY,
+                offsetX = saved.offsetX or def.offsetX,
+                offsetY = saved.offsetY or def.offsetY,
+                justifyH = saved.justifyH or "CENTER",
+                overrides = saved.overrides,
+            }
+            
+            -- Calculate start position (center-relative)
+            -- Use saved posX/posY directly if available (more accurate than anchor/offset conversion)
+            local halfW, halfH = w / 2, h / 2
+            local startX, startY = saved.posX or 0, saved.posY or 0
+            
+            -- If no posX/posY saved, convert from anchor/offset
+            if not saved.posX then
+                if data.anchorX == "LEFT" then
+                    startX = -halfW + data.offsetX
+                elseif data.anchorX == "RIGHT" then
+                    startX = halfW - data.offsetX
+                end
+            end
+            if not saved.posY then
+                if data.anchorY == "BOTTOM" then
+                    startY = -halfH + data.offsetY
+                elseif data.anchorY == "TOP" then
+                    startY = halfH - data.offsetY
+                end
+            end
+            
+            -- Create draggable component if available
+            if CreateDraggableComponent then
+                local comp = CreateDraggableComponent(preview, def.key, fs, startX, startY, data)
+                if comp then
+                    -- Ensure text is above the border
+                    comp:SetFrameLevel(preview:GetFrameLevel() + 10)
+                    preview.components[def.key] = comp
+                    fs:Hide()  -- Hide original, comp has its own visual
+                end
+            else
+                -- Fallback: just position the FontString directly
+                fs:ClearAllPoints()
+                fs:SetPoint("CENTER", preview, "CENTER", startX, startY)
+            end
+        end
         
         return preview
     end
@@ -1049,39 +1141,68 @@ end
 
 function Plugin:GetSpellKeybind(spellID)
     if not spellID then return nil end
-    local slots = C_ActionBar.FindSpellActionButtons(spellID)
-    if not slots or #slots == 0 then return nil end
     
-    local slot = slots[1]
-    local page = math.floor((slot - 1) / 12) + 1
-    local buttonIndex = ((slot - 1) % 12) + 1
+    -- Wrap in pcall because C_ActionBar.FindSpellActionButtons can return secret values
+    -- in combat that error when using length operator or arithmetic
+    local success, result = pcall(function()
+        local slots = C_ActionBar.FindSpellActionButtons(spellID)
+        if not slots then return nil end
+        
+        -- Use next() to check for empty table (avoids # on secret)
+        local slot = slots[1]
+        if not slot then return nil end
+        
+        local page = math.floor((slot - 1) / 12) + 1
+        local buttonIndex = ((slot - 1) % 12) + 1
+        
+        -- Determine binding name based on bar/page
+        local bindingName
+        if page == 1 then
+            bindingName = "ACTIONBUTTON" .. buttonIndex
+        elseif page == 2 then
+            bindingName = "MULTIACTIONBAR1BUTTON" .. buttonIndex
+        elseif page == 3 then
+            bindingName = "MULTIACTIONBAR2BUTTON" .. buttonIndex
+        elseif page == 4 then
+            bindingName = "MULTIACTIONBAR3BUTTON" .. buttonIndex
+        elseif page == 5 then
+            bindingName = "MULTIACTIONBAR4BUTTON" .. buttonIndex
+        else
+            -- Fallback for additional bars
+            bindingName = "ACTIONBUTTON" .. buttonIndex
+        end
+        
+        local key = GetBindingKey(bindingName)
+        if key then
+            return GetBindingText(key, true) -- 'true' = abbreviated format
+        end
+        return nil
+    end)
     
-    -- Determine binding name based on bar/page
-    local bindingName
-    if page == 1 then
-        bindingName = "ACTIONBUTTON" .. buttonIndex
-    elseif page == 2 then
-        bindingName = "MULTIACTIONBAR1BUTTON" .. buttonIndex
-    elseif page == 3 then
-        bindingName = "MULTIACTIONBAR2BUTTON" .. buttonIndex
-    elseif page == 4 then
-        bindingName = "MULTIACTIONBAR3BUTTON" .. buttonIndex
-    elseif page == 5 then
-        bindingName = "MULTIACTIONBAR4BUTTON" .. buttonIndex
-    else
-        -- Fallback for additional bars
-        bindingName = "ACTIONBUTTON" .. buttonIndex
+    if success then
+        return result
     end
-    
-    local key = GetBindingKey(bindingName)
-    if key then
-        return GetBindingText(key, true) -- 'true' = abbreviated format
-    end
+    -- If secret value error occurred, just return nil silently
     return nil
 end
 
+-- Get or create a high-level text overlay frame for the icon
+-- This ensures text is always above glow effects, swipe, and borders
+function Plugin:GetTextOverlay(icon)
+    if icon.OrbitTextOverlay then
+        return icon.OrbitTextOverlay
+    end
+    
+    local overlay = CreateFrame("Frame", nil, icon)
+    overlay:SetAllPoints()
+    overlay:SetFrameLevel(icon:GetFrameLevel() + 20)  -- Well above glow effects
+    icon.OrbitTextOverlay = overlay
+    return overlay
+end
+
 function Plugin:CreateKeybindText(icon)
-    local keybind = icon:CreateFontString(nil, "OVERLAY")
+    local overlay = self:GetTextOverlay(icon)
+    local keybind = overlay:CreateFontString(nil, "OVERLAY", nil, 7)  -- Sublevel 7 (highest)
     keybind:SetPoint("TOPRIGHT", icon, "TOPRIGHT", -2, -2)
     keybind:Hide()
     icon.OrbitKeybind = keybind
@@ -1091,52 +1212,231 @@ end
 function Plugin:ApplyTextSettings(icon, systemIndex)
     local fontPath = self:GetGlobalFont()
     local baseSize = self:GetBaseFontSize()
+    local LSM = LibStub("LibSharedMedia-3.0", true)
+    
+    -- Get Canvas Mode component positions and overrides
+    local positions = self:GetSetting(systemIndex, "ComponentPositions") or {}
+    
+    -- Helper to apply style overrides
+    local function GetComponentStyle(key, defaultOffset)
+        local pos = positions[key] or {}
+        local overrides = pos.overrides or {}
+        
+        local font = fontPath
+        if overrides.Font and LSM then
+            font = LSM:Fetch("font", overrides.Font) or fontPath
+        end
+        
+        local sizeOffset = self:GetSetting(systemIndex, key .. "SizeOffset") or 0
+        local size = overrides.FontSize or math.max(6, baseSize + sizeOffset + (defaultOffset or 0))
+        
+        local flags = "OUTLINE"
+        if overrides.ShowShadow then
+            flags = ""  -- Shadow instead of outline
+        end
+        
+        return font, size, flags, pos, overrides
+    end
     
     -- Timer (Cooldown countdown text)
-    -- The countdown text is a FontString child of the Cooldown frame
-    local timerOffset = self:GetSetting(systemIndex, "TimerSizeOffset") or 0
-    local timerSize = math.max(6, baseSize + timerOffset + 2)
     local cooldown = icon.Cooldown or (icon.GetCooldownFrame and icon:GetCooldownFrame())
     if cooldown then
-        -- Method 1: Try to find the Text region directly
-        if cooldown.Text and cooldown.Text.SetFont then
-            cooldown.Text:SetFont(fontPath, timerSize, "OUTLINE")
+        -- Check if Timer is disabled via Canvas Mode
+        if self:IsComponentDisabled("Timer", systemIndex) then
+            if cooldown.SetHideCountdownNumbers then
+                cooldown:SetHideCountdownNumbers(true)
+            end
         else
-            -- Method 2: Iterate through regions to find FontStrings
-            local regions = { cooldown:GetRegions() }
-            for _, region in ipairs(regions) do
-                if region:GetObjectType() == "FontString" then
-                    region:SetFont(fontPath, timerSize, "OUTLINE")
+            local timerFont, timerSize, timerFlags, timerPos = GetComponentStyle("Timer", 2)
+            local timerText = nil
+            if cooldown.Text and cooldown.Text.SetFont then
+                timerText = cooldown.Text
+            else
+                -- Find FontString in regions
+                local regions = { cooldown:GetRegions() }
+                for _, region in ipairs(regions) do
+                    if region:GetObjectType() == "FontString" then
+                        timerText = region
+                        break
+                    end
+                end
+            end
+            
+            if timerText then
+                timerText:SetFont(timerFont, timerSize, timerFlags)
+                timerText:SetDrawLayer("OVERLAY", 7)  -- Highest sublevel
+                
+                -- Apply position if overridden
+                -- Prefer posX/posY (center-relative) if available, otherwise use anchor/offset
+                if timerPos.posX ~= nil and timerPos.posY ~= nil then
+                    -- Simple center-relative positioning
+                    timerText:ClearAllPoints()
+                    timerText:SetPoint("CENTER", cooldown, "CENTER", timerPos.posX, timerPos.posY)
+                elseif timerPos.anchorX then
+                    -- Legacy anchor-based positioning
+                    local anchor = timerPos.anchorY .. timerPos.anchorX
+                    if timerPos.anchorY == "CENTER" and timerPos.anchorX == "CENTER" then
+                        anchor = "CENTER"
+                    elseif timerPos.anchorY == "CENTER" then
+                        anchor = timerPos.anchorX
+                    elseif timerPos.anchorX == "CENTER" then
+                        anchor = timerPos.anchorY
+                    end
+                    timerText:ClearAllPoints()
+                    local offsetX = timerPos.anchorX == "LEFT" and timerPos.offsetX or -timerPos.offsetX
+                    local offsetY = timerPos.anchorY == "BOTTOM" and timerPos.offsetY or -timerPos.offsetY
+                    timerText:SetPoint(anchor, cooldown, anchor, offsetX, offsetY)
                 end
             end
         end
     end
     
     -- Charges (ChargeCount.Current FontString)
-    local chargesOffset = self:GetSetting(systemIndex, "ChargesSizeOffset") or 0
-    local chargesSize = math.max(6, baseSize + chargesOffset)
     if icon.ChargeCount and icon.ChargeCount.Current then
-        icon.ChargeCount.Current:SetFont(fontPath, chargesSize, "OUTLINE")
+        -- Check if Charges is disabled via Canvas Mode
+        if self:IsComponentDisabled("Charges", systemIndex) then
+            -- Use alpha to hide (more reliable than Hide for child elements)
+            icon.ChargeCount.orbitForceHide = true
+            icon.ChargeCount:SetAlpha(0)
+            icon.ChargeCount.Current:SetAlpha(0)
+            
+            -- Hook SetAlpha on the FontString to force alpha back to 0
+            if not icon.ChargeCount.Current.orbitAlphaHooked then
+                icon.ChargeCount.Current.orbitAlphaHooked = true
+                hooksecurefunc(icon.ChargeCount.Current, "SetAlpha", function(text, alpha)
+                    if icon.ChargeCount.orbitForceHide and alpha > 0 then
+                        text:SetAlpha(0)
+                    end
+                end)
+            end
+            
+            -- Hook SetText to ensure text stays invisible even when updated
+            if not icon.ChargeCount.Current.orbitTextHooked then
+                icon.ChargeCount.Current.orbitTextHooked = true
+                hooksecurefunc(icon.ChargeCount.Current, "SetText", function(text)
+                    if icon.ChargeCount.orbitForceHide then
+                        text:SetAlpha(0)
+                    end
+                end)
+            end
+        else
+            icon.ChargeCount.orbitForceHide = nil
+            icon.ChargeCount:SetAlpha(1)
+            icon.ChargeCount.Current:SetAlpha(1)
+            local chargesFont, chargesSize, chargesFlags, chargesPos = GetComponentStyle("Charges", 0)
+            -- Don't call Show() - let Blizzard manage visibility based on actual charges
+            icon.ChargeCount.Current:SetFont(chargesFont, chargesSize, chargesFlags)
+            icon.ChargeCount.Current:SetDrawLayer("OVERLAY", 7)  -- Highest sublevel
+            
+            -- Ensure ChargeCount frame is above glows
+            if icon.ChargeCount.SetFrameLevel then
+                icon.ChargeCount:SetFrameLevel(icon:GetFrameLevel() + 20)
+            end
+            
+            -- Apply position if overridden (prefer center-relative)
+            if chargesPos.posX ~= nil and chargesPos.posY ~= nil then
+                icon.ChargeCount.Current:ClearAllPoints()
+                icon.ChargeCount.Current:SetPoint("CENTER", icon, "CENTER", chargesPos.posX, chargesPos.posY)
+            elseif chargesPos.anchorX then
+                local anchor = chargesPos.anchorY .. chargesPos.anchorX
+                if chargesPos.anchorY == "CENTER" and chargesPos.anchorX == "CENTER" then
+                    anchor = "CENTER"
+                elseif chargesPos.anchorY == "CENTER" then
+                    anchor = chargesPos.anchorX
+                elseif chargesPos.anchorX == "CENTER" then
+                    anchor = chargesPos.anchorY
+                end
+                icon.ChargeCount.Current:ClearAllPoints()
+                local offsetX = chargesPos.anchorX == "LEFT" and chargesPos.offsetX or -chargesPos.offsetX
+                local offsetY = chargesPos.anchorY == "BOTTOM" and chargesPos.offsetY or -chargesPos.offsetY
+                icon.ChargeCount.Current:SetPoint(anchor, icon, anchor, offsetX, offsetY)
+            end
+        end
     end
     
     -- Stacks (BuffIcon viewer uses Applications.Applications)
-    local stacksOffset = self:GetSetting(systemIndex, "StacksSizeOffset") or 0
-    local stacksSize = math.max(6, baseSize + stacksOffset)
     if icon.Applications then
-        local stackText = icon.Applications.Applications or icon.Applications
-        if stackText and stackText.SetFont then
-            stackText:SetFont(fontPath, stacksSize, "OUTLINE")
+        -- Check if Stacks is disabled via Canvas Mode
+        if self:IsComponentDisabled("Stacks", systemIndex) then
+            icon.Applications.orbitForceHide = true
+            icon.Applications:Hide()
+            -- Hook Show to prevent Blizzard from overriding
+            if not icon.Applications.orbitShowHooked then
+                icon.Applications.orbitShowHooked = true
+                hooksecurefunc(icon.Applications, "Show", function(self)
+                    if self.orbitForceHide then
+                        self:Hide()
+                    end
+                end)
+            end
+        else
+            icon.Applications.orbitForceHide = nil
+            local stacksFont, stacksSize, stacksFlags, stacksPos = GetComponentStyle("Stacks", 0)
+            -- Don't call Show() - let Blizzard manage visibility based on actual stacks
+            local stackText = icon.Applications.Applications or icon.Applications
+            if stackText and stackText.SetFont then
+                stackText:SetFont(stacksFont, stacksSize, stacksFlags)
+                if stackText.SetDrawLayer then
+                    stackText:SetDrawLayer("OVERLAY", 7)  -- Highest sublevel
+                end
+                
+                -- Ensure Applications frame is above glows
+                if icon.Applications.SetFrameLevel then
+                    icon.Applications:SetFrameLevel(icon:GetFrameLevel() + 20)
+                end
+                
+                -- Apply position if overridden (prefer center-relative)
+                if stacksPos.posX ~= nil and stacksPos.posY ~= nil then
+                    stackText:ClearAllPoints()
+                    stackText:SetPoint("CENTER", icon, "CENTER", stacksPos.posX, stacksPos.posY)
+                elseif stacksPos.anchorX then
+                    local anchor = stacksPos.anchorY .. stacksPos.anchorX
+                    if stacksPos.anchorY == "CENTER" and stacksPos.anchorX == "CENTER" then
+                        anchor = "CENTER"
+                    elseif stacksPos.anchorY == "CENTER" then
+                        anchor = stacksPos.anchorX
+                    elseif stacksPos.anchorX == "CENTER" then
+                        anchor = stacksPos.anchorY
+                    end
+                    stackText:ClearAllPoints()
+                    local offsetX = stacksPos.anchorX == "LEFT" and stacksPos.offsetX or -stacksPos.offsetX
+                    local offsetY = stacksPos.anchorY == "BOTTOM" and stacksPos.offsetY or -stacksPos.offsetY
+                    stackText:SetPoint(anchor, icon, anchor, offsetX, offsetY)
+                end
+            end
         end
     end
     
     -- Keybind display
     local showKeybinds = self:GetSetting(systemIndex, "ShowKeybinds")
-    local keybindOffset = self:GetSetting(systemIndex, "KeybindSizeOffset") or 0
-    local keybindSize = math.max(6, baseSize + keybindOffset - 2)
+    -- Also check if keybind is disabled via Canvas Mode
+    if self:IsComponentDisabled("Keybind", systemIndex) then
+        showKeybinds = false
+    end
+    local keybindFont, keybindSize, keybindFlags, keybindPos = GetComponentStyle("Keybind", -2)
     
     if showKeybinds then
         local keybind = icon.OrbitKeybind or self:CreateKeybindText(icon)
-        keybind:SetFont(fontPath, keybindSize, "OUTLINE")
+        keybind:SetFont(keybindFont, keybindSize, keybindFlags)
+        
+        -- Apply position if overridden (prefer center-relative)
+        if keybindPos.posX ~= nil and keybindPos.posY ~= nil then
+            keybind:ClearAllPoints()
+            keybind:SetPoint("CENTER", icon, "CENTER", keybindPos.posX, keybindPos.posY)
+        elseif keybindPos.anchorX then
+            local anchor = keybindPos.anchorY .. keybindPos.anchorX
+            if keybindPos.anchorY == "CENTER" and keybindPos.anchorX == "CENTER" then
+                anchor = "CENTER"
+            elseif keybindPos.anchorY == "CENTER" then
+                anchor = keybindPos.anchorX
+            elseif keybindPos.anchorX == "CENTER" then
+                anchor = keybindPos.anchorY
+            end
+            keybind:ClearAllPoints()
+            local offsetX = keybindPos.anchorX == "LEFT" and keybindPos.offsetX or -keybindPos.offsetX
+            local offsetY = keybindPos.anchorY == "BOTTOM" and keybindPos.offsetY or -keybindPos.offsetY
+            keybind:SetPoint(anchor, icon, anchor, offsetX, offsetY)
+        end
         
         -- Get spell ID from the icon
         local spellID = icon.GetSpellID and icon:GetSpellID()

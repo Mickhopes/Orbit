@@ -76,8 +76,10 @@ local function CreateDraggableComponent(preview, key, sourceComponent, startX, s
         visual = container:CreateFontString(nil, "OVERLAY")
         
         local fontPath, fontSize, fontFlags = sourceComponent:GetFont()
+        -- Default to OUTLINE if flags is nil or empty (most WoW text uses outline)
+        local flags = (fontFlags and fontFlags ~= "") and fontFlags or "OUTLINE"
         if fontPath and fontSize then
-            visual:SetFont(fontPath, fontSize, fontFlags or "")
+            visual:SetFont(fontPath, fontSize, flags)
         else
             local globalFontName = Orbit.db and Orbit.db.GlobalSettings and Orbit.db.GlobalSettings.Font
             local fallbackPath = LSM:Fetch("font", globalFontName) or Orbit.Constants.Settings.Font.FallbackPath

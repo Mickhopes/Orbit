@@ -378,6 +378,12 @@ function Dialog:Open(frame, plugin, systemIndex)
     local hasDisabledFeature = plugin and plugin.IsComponentDisabled
     local disabledComponents = hasDisabledFeature and plugin:GetSetting(systemIndex, "DisabledComponents") or {}
     
+    -- Initialize disabledComponentKeys from saved data
+    self.disabledComponentKeys = {}
+    for _, key in ipairs(disabledComponents) do
+        table.insert(self.disabledComponentKeys, key)
+    end
+    
     local function isDisabled(key)
         if not hasDisabledFeature then return false end
         for _, k in ipairs(disabledComponents) do
@@ -387,12 +393,33 @@ function Dialog:Open(frame, plugin, systemIndex)
     end
     
     wipe(self.previewComponents)
-    for key, data in pairs(components) do
-        if isDisabled(key) then
-            self:AddToDock(key, data.component)
-        else
-            local comp = CreateDraggableComponent(self.previewFrame, key, data.component, data.x, data.y, data)
-            self.previewComponents[key] = comp
+    
+    -- Check if preview already has components from CreateCanvasPreview hook
+    if self.previewFrame.components and next(self.previewFrame.components) then
+        for key, comp in pairs(self.previewFrame.components) do
+            -- Check if this component should be disabled
+            if isDisabled(key) then
+                -- Hide the component and add to dock instead
+                comp:Hide()
+                local sourceComponent = comp.sourceComponent or comp
+                self:AddToDock(key, sourceComponent)
+                -- Store reference to original draggable comp so we can restore it
+                if self.dockComponents[key] then
+                    self.dockComponents[key].storedDraggableComp = comp
+                end
+            else
+                self.previewComponents[key] = comp
+            end
+        end
+    else
+        -- Fallback: create from ComponentDrag-registered components
+        for key, data in pairs(components) do
+            if isDisabled(key) then
+                self:AddToDock(key, data.component)
+            else
+                local comp = CreateDraggableComponent(self.previewFrame, key, data.component, data.x, data.y, data)
+                self.previewComponents[key] = comp
+            end
         end
     end
     
@@ -477,6 +504,8 @@ function Dialog:Apply()
             offsetX = offsetX,
             offsetY = offsetY,
             justifyH = justifyH,
+            posX = comp.posX or 0,  -- Also save center-relative for easier restoration
+            posY = comp.posY or 0,
         }
         
         if comp.pendingOverrides then

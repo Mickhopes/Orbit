@@ -373,11 +373,13 @@ function Dialog:ApplyStyle(container, key, value)
     -- Apply style based on key
     if key == "FontSize" and visual.SetFont then
         local font, _, flags = visual:GetFont()
+        flags = (flags and flags ~= "") and flags or "OUTLINE"
         visual:SetFont(font, value, flags)
     elseif key == "Font" and visual.SetFont then
         local fontPath = LSM:Fetch("font", value)
         if fontPath then
             local _, size, flags = visual:GetFont()
+            flags = (flags and flags ~= "") and flags or "OUTLINE"
             visual:SetFont(fontPath, size or 12, flags)
         end
     elseif key == "ShowShadow" and visual.SetShadowOffset then

@@ -171,8 +171,17 @@ function Dialog:AddToDock(key, sourceComponent)
     
     self.dockComponents[key] = icon
     
-    -- Track as disabled
-    table.insert(self.disabledComponentKeys, key)
+    -- Track as disabled (only if not already tracked)
+    local alreadyTracked = false
+    for _, k in ipairs(self.disabledComponentKeys) do
+        if k == key then
+            alreadyTracked = true
+            break
+        end
+    end
+    if not alreadyTracked then
+        table.insert(self.disabledComponentKeys, key)
+    end
     
     self:LayoutDockIcons()
 end
@@ -201,8 +210,19 @@ end
 -- [ RESTORE FROM DOCK ]------------------------------------------------------------------
 
 function Dialog:RestoreFromDock(key)
+    -- Get stored draggable component reference from dock icon
+    local dockIcon = self.dockComponents[key]
+    local storedComp = dockIcon and dockIcon.storedDraggableComp
+    
     -- Remove from dock
     self:RemoveFromDock(key)
+    
+    -- If we have a stored draggable component (CDM path), just re-show it
+    if storedComp then
+        storedComp:Show()
+        Dialog.previewComponents[key] = storedComp
+        return
+    end
     
     -- Create component in preview at saved position
     local savedPositions = self.targetPlugin and self.targetPlugin:GetSetting(self.targetSystemIndex, "ComponentPositions") or {}
