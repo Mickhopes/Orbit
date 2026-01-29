@@ -110,6 +110,11 @@ end)
 
 -- Click outside to close (via OnUpdate check)
 Dialog:SetScript("OnUpdate", function(self)
+    -- Don't close while ColorPickerFrame is open (user may be dragging colors)
+    if ColorPickerFrame and ColorPickerFrame:IsShown() then
+        return
+    end
+    
     if not self:IsMouseOver() and IsMouseButtonDown("LeftButton") then
         -- Check if clicking on the parent Canvas Mode dialog
         local canvasDialog = Orbit.CanvasModeDialog
