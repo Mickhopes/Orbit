@@ -1152,26 +1152,41 @@ function Plugin:ApplyTextSettings(icon, systemIndex)
                 timerText:SetFont(timerFont, timerSize, timerFlags)
                 timerText:SetDrawLayer("OVERLAY", 7)  -- Highest sublevel
                 
+                -- Apply JustifyH if saved (from Canvas Mode drag)
+                if timerPos.justifyH and timerText.SetJustifyH then
+                    timerText:SetJustifyH(timerPos.justifyH)
+                end
+                
                 -- Apply position if overridden
-                -- Prefer posX/posY (center-relative) if available, otherwise use anchor/offset
+                -- Use icon as anchor (not cooldown) to match Canvas Mode coordinates
+                -- Prefer posX/posY (center-relative) if available
                 if timerPos.posX ~= nil and timerPos.posY ~= nil then
-                    -- Simple center-relative positioning
                     timerText:ClearAllPoints()
-                    timerText:SetPoint("CENTER", cooldown, "CENTER", timerPos.posX, timerPos.posY)
+                    timerText:SetPoint("CENTER", icon, "CENTER", timerPos.posX, timerPos.posY)
                 elseif timerPos.anchorX then
-                    -- Legacy anchor-based positioning
-                    local anchor = timerPos.anchorY .. timerPos.anchorX
+                    -- Anchor-based positioning with JustifyH decoupled pattern
+                    local anchorPoint = timerPos.anchorY .. timerPos.anchorX
                     if timerPos.anchorY == "CENTER" and timerPos.anchorX == "CENTER" then
-                        anchor = "CENTER"
+                        anchorPoint = "CENTER"
                     elseif timerPos.anchorY == "CENTER" then
-                        anchor = timerPos.anchorX
+                        anchorPoint = timerPos.anchorX
                     elseif timerPos.anchorX == "CENTER" then
-                        anchor = timerPos.anchorY
+                        anchorPoint = timerPos.anchorY
                     end
+                    
+                    -- Use JustifyH as the text's anchor point (decoupled pattern)
+                    local textPoint = timerPos.justifyH or anchorPoint
+                    if timerPos.anchorY ~= "CENTER" then
+                        textPoint = timerPos.anchorY .. (timerPos.justifyH or timerPos.anchorX)
+                        if timerPos.justifyH == "CENTER" then
+                            textPoint = timerPos.anchorY
+                        end
+                    end
+                    
                     timerText:ClearAllPoints()
                     local offsetX = timerPos.anchorX == "LEFT" and timerPos.offsetX or -timerPos.offsetX
                     local offsetY = timerPos.anchorY == "BOTTOM" and timerPos.offsetY or -timerPos.offsetY
-                    timerText:SetPoint(anchor, cooldown, anchor, offsetX, offsetY)
+                    timerText:SetPoint(textPoint, icon, anchorPoint, offsetX, offsetY)
                 end
             end
         end
@@ -1214,6 +1229,11 @@ function Plugin:ApplyTextSettings(icon, systemIndex)
             icon.ChargeCount.Current:SetFont(chargesFont, chargesSize, chargesFlags)
             icon.ChargeCount.Current:SetDrawLayer("OVERLAY", 7)  -- Highest sublevel
             
+            -- Apply JustifyH if saved (from Canvas Mode drag)
+            if chargesPos.justifyH and icon.ChargeCount.Current.SetJustifyH then
+                icon.ChargeCount.Current:SetJustifyH(chargesPos.justifyH)
+            end
+            
             -- Ensure ChargeCount frame is above glows
             if icon.ChargeCount.SetFrameLevel then
                 icon.ChargeCount:SetFrameLevel(icon:GetFrameLevel() + 20)
@@ -1224,18 +1244,28 @@ function Plugin:ApplyTextSettings(icon, systemIndex)
                 icon.ChargeCount.Current:ClearAllPoints()
                 icon.ChargeCount.Current:SetPoint("CENTER", icon, "CENTER", chargesPos.posX, chargesPos.posY)
             elseif chargesPos.anchorX then
-                local anchor = chargesPos.anchorY .. chargesPos.anchorX
+                local anchorPoint = chargesPos.anchorY .. chargesPos.anchorX
                 if chargesPos.anchorY == "CENTER" and chargesPos.anchorX == "CENTER" then
-                    anchor = "CENTER"
+                    anchorPoint = "CENTER"
                 elseif chargesPos.anchorY == "CENTER" then
-                    anchor = chargesPos.anchorX
+                    anchorPoint = chargesPos.anchorX
                 elseif chargesPos.anchorX == "CENTER" then
-                    anchor = chargesPos.anchorY
+                    anchorPoint = chargesPos.anchorY
                 end
+                
+                -- Use JustifyH as the text's anchor point (decoupled pattern)
+                local textPoint = chargesPos.justifyH or anchorPoint
+                if chargesPos.anchorY ~= "CENTER" then
+                    textPoint = chargesPos.anchorY .. (chargesPos.justifyH or chargesPos.anchorX)
+                    if chargesPos.justifyH == "CENTER" then
+                        textPoint = chargesPos.anchorY
+                    end
+                end
+                
                 icon.ChargeCount.Current:ClearAllPoints()
                 local offsetX = chargesPos.anchorX == "LEFT" and chargesPos.offsetX or -chargesPos.offsetX
                 local offsetY = chargesPos.anchorY == "BOTTOM" and chargesPos.offsetY or -chargesPos.offsetY
-                icon.ChargeCount.Current:SetPoint(anchor, icon, anchor, offsetX, offsetY)
+                icon.ChargeCount.Current:SetPoint(textPoint, icon, anchorPoint, offsetX, offsetY)
             end
         end
     end
@@ -1266,6 +1296,11 @@ function Plugin:ApplyTextSettings(icon, systemIndex)
                     stackText:SetDrawLayer("OVERLAY", 7)  -- Highest sublevel
                 end
                 
+                -- Apply JustifyH if saved (from Canvas Mode drag)
+                if stacksPos.justifyH and stackText.SetJustifyH then
+                    stackText:SetJustifyH(stacksPos.justifyH)
+                end
+                
                 -- Ensure Applications frame is above glows
                 if icon.Applications.SetFrameLevel then
                     icon.Applications:SetFrameLevel(icon:GetFrameLevel() + 20)
@@ -1276,18 +1311,28 @@ function Plugin:ApplyTextSettings(icon, systemIndex)
                     stackText:ClearAllPoints()
                     stackText:SetPoint("CENTER", icon, "CENTER", stacksPos.posX, stacksPos.posY)
                 elseif stacksPos.anchorX then
-                    local anchor = stacksPos.anchorY .. stacksPos.anchorX
+                    local anchorPoint = stacksPos.anchorY .. stacksPos.anchorX
                     if stacksPos.anchorY == "CENTER" and stacksPos.anchorX == "CENTER" then
-                        anchor = "CENTER"
+                        anchorPoint = "CENTER"
                     elseif stacksPos.anchorY == "CENTER" then
-                        anchor = stacksPos.anchorX
+                        anchorPoint = stacksPos.anchorX
                     elseif stacksPos.anchorX == "CENTER" then
-                        anchor = stacksPos.anchorY
+                        anchorPoint = stacksPos.anchorY
                     end
+                    
+                    -- Use JustifyH as the text's anchor point (decoupled pattern)
+                    local textPoint = stacksPos.justifyH or anchorPoint
+                    if stacksPos.anchorY ~= "CENTER" then
+                        textPoint = stacksPos.anchorY .. (stacksPos.justifyH or stacksPos.anchorX)
+                        if stacksPos.justifyH == "CENTER" then
+                            textPoint = stacksPos.anchorY
+                        end
+                    end
+                    
                     stackText:ClearAllPoints()
                     local offsetX = stacksPos.anchorX == "LEFT" and stacksPos.offsetX or -stacksPos.offsetX
                     local offsetY = stacksPos.anchorY == "BOTTOM" and stacksPos.offsetY or -stacksPos.offsetY
-                    stackText:SetPoint(anchor, icon, anchor, offsetX, offsetY)
+                    stackText:SetPoint(textPoint, icon, anchorPoint, offsetX, offsetY)
                 end
             end
         end
@@ -1301,23 +1346,38 @@ function Plugin:ApplyTextSettings(icon, systemIndex)
         local keybind = icon.OrbitKeybind or self:CreateKeybindText(icon)
         keybind:SetFont(keybindFont, keybindSize, keybindFlags)
         
+        -- Apply JustifyH if saved (from Canvas Mode drag)
+        if keybindPos.justifyH and keybind.SetJustifyH then
+            keybind:SetJustifyH(keybindPos.justifyH)
+        end
+        
         -- Apply position if overridden (prefer center-relative)
         if keybindPos.posX ~= nil and keybindPos.posY ~= nil then
             keybind:ClearAllPoints()
             keybind:SetPoint("CENTER", icon, "CENTER", keybindPos.posX, keybindPos.posY)
         elseif keybindPos.anchorX then
-            local anchor = keybindPos.anchorY .. keybindPos.anchorX
+            local anchorPoint = keybindPos.anchorY .. keybindPos.anchorX
             if keybindPos.anchorY == "CENTER" and keybindPos.anchorX == "CENTER" then
-                anchor = "CENTER"
+                anchorPoint = "CENTER"
             elseif keybindPos.anchorY == "CENTER" then
-                anchor = keybindPos.anchorX
+                anchorPoint = keybindPos.anchorX
             elseif keybindPos.anchorX == "CENTER" then
-                anchor = keybindPos.anchorY
+                anchorPoint = keybindPos.anchorY
             end
+            
+            -- Use JustifyH as the text's anchor point (decoupled pattern)
+            local textPoint = keybindPos.justifyH or anchorPoint
+            if keybindPos.anchorY ~= "CENTER" then
+                textPoint = keybindPos.anchorY .. (keybindPos.justifyH or keybindPos.anchorX)
+                if keybindPos.justifyH == "CENTER" then
+                    textPoint = keybindPos.anchorY
+                end
+            end
+            
             keybind:ClearAllPoints()
             local offsetX = keybindPos.anchorX == "LEFT" and keybindPos.offsetX or -keybindPos.offsetX
             local offsetY = keybindPos.anchorY == "BOTTOM" and keybindPos.offsetY or -keybindPos.offsetY
-            keybind:SetPoint(anchor, icon, anchor, offsetX, offsetY)
+            keybind:SetPoint(textPoint, icon, anchorPoint, offsetX, offsetY)
         end
         
         -- Get spell ID from the icon
