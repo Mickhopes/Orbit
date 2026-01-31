@@ -799,25 +799,33 @@ function Plugin:UpdateMaxPower()
 
             btn.SetActive = function(self, active)
                 self.isActive = active
-                if self.orbitBar then
-                    if active then
+                if active then
+                    -- Show fill, hide progress bar immediately (no visual gap)
+                    if self.orbitBar then
                         self.orbitBar:Show()
-                        if self.Overlay then
-                            self.Overlay:Show()
-                        end
-                    else
-                        self.orbitBar:Hide()
-                        if self.Overlay then
-                            self.Overlay:Hide()
-                        end
                     end
+                    if self.Overlay then
+                        self.Overlay:Show()
+                    end
+                    if self.progressBar then
+                        self.progressBar:Hide()
+                    end
+                else
+                    -- Hide fill
+                    if self.orbitBar then
+                        self.orbitBar:Hide()
+                    end
+                    if self.Overlay then
+                        self.Overlay:Hide()
+                    end
+                    -- Progress bar visibility is controlled by SetFraction
                 end
             end
 
             btn.SetFraction = function(self, fraction)
                 if self.progressBar then
                     if fraction > 0 and fraction < 1 then
-                        self.progressBar:SetValue(fraction, SMOOTH_ANIM)
+                        self.progressBar:SetValue(fraction)
                         self.progressBar:Show()
                     else
                         self.progressBar:Hide()
@@ -832,6 +840,14 @@ function Plugin:UpdateMaxPower()
         local btn = Frame.buttons[i]
         if btn then
             btn:Hide()
+        end
+    end
+    
+    -- Show buttons up to current max (e.g., respeccing from Dev 5 to Aug 6)
+    for i = 1, max do
+        local btn = Frame.buttons[i]
+        if btn then
+            btn:Show()
         end
     end
 
@@ -1089,22 +1105,41 @@ function Plugin:UpdatePower()
                 local state, remaining, fraction = ResourceMixin:GetEssenceState(i, current, max)
 
                 if state == "full" then
-                    btn:SetActive(true)
-                    btn:SetFraction(0)
-
+                    -- Full: show orbitBar at full brightness, hide progress
                     if btn.orbitBar then
+                        btn.orbitBar:Show()
                         btn.orbitBar:SetVertexColor(color.r, color.g, color.b)
                     end
-                elseif state == "partial" then
-                    btn:SetActive(false)
-                    btn:SetFraction(fraction)
-
+                    if btn.Overlay then
+                        btn.Overlay:Show()
+                    end
                     if btn.progressBar then
-                        btn.progressBar:SetStatusBarColor(color.r * 0.5, color.g * 0.5, color.b * 0.5)
+                        btn.progressBar:Hide()
+                    end
+                elseif state == "partial" then
+                    -- Partial: show orbitBar at dimmed color underneath progress bar
+                    if btn.orbitBar then
+                        btn.orbitBar:Show()
+                        btn.orbitBar:SetVertexColor(color.r * 0.5, color.g * 0.5, color.b * 0.5)
+                    end
+                    if btn.Overlay then
+                        btn.Overlay:Hide()
+                    end
+                    btn:SetFraction(fraction)
+                    if btn.progressBar then
+                        btn.progressBar:SetStatusBarColor(color.r * 0.7, color.g * 0.7, color.b * 0.7)
                     end
                 else
-                    btn:SetActive(false)
-                    btn:SetFraction(0)
+                    -- Empty: hide orbitBar and progress
+                    if btn.orbitBar then
+                        btn.orbitBar:Hide()
+                    end
+                    if btn.Overlay then
+                        btn.Overlay:Hide()
+                    end
+                    if btn.progressBar then
+                        btn.progressBar:Hide()
+                    end
                 end
             end
         end
