@@ -96,6 +96,9 @@ function Orbit.BossFramePreviewMixin:ApplyPreviewVisuals()
     local height = self:GetSetting(1, "Height") or PREVIEW_DEFAULTS.Height
     local textureName = self:GetSetting(1, "Texture")
     local texturePath = LSM:Fetch("statusbar", textureName) or "Interface\\TargetingFrame\\UI-StatusBar"
+    
+    -- Get Colors tab global settings (for reference only - helpers read them)
+    local globalSettings = Orbit.db.GlobalSettings or {}
 
     -- Build debuff icon list from sample icons (no table allocation per call)
     local maxDebuffs = self:GetSetting(1, "MaxDebuffs") or 4
@@ -106,16 +109,31 @@ function Orbit.BossFramePreviewMixin:ApplyPreviewVisuals()
 
             -- Set frame size
             frame:SetSize(width, height)
+            
+            -- Apply backdrop color using shared helper
+            if self.ApplyPreviewBackdrop then
+                self:ApplyPreviewBackdrop(frame)
+            end
 
             -- Apply texture and set up health bar
             if frame.Health then
                 frame.Health:ClearAllPoints()
                 frame.Health:SetPoint("TOPLEFT", 1, -1)
                 frame.Health:SetPoint("BOTTOMRIGHT", -1, height * POWER_BAR_HEIGHT_RATIO + 1)
-                frame.Health:SetStatusBarTexture(texturePath)
+                
+                -- Use SkinStatusBar with isUnitFrame=true (respects OverlayAllFrames)
+                Orbit.Skin:SkinStatusBar(frame.Health, textureName, nil, true)
+                
                 frame.Health:SetMinMaxValues(0, 100)
                 frame.Health:SetValue(PREVIEW_DEFAULTS.HealthPercent)
-                frame.Health:SetStatusBarColor(1, 0.1, 0.1) -- Red for hostile boss
+                
+                -- Apply color using shared helper (bosses are hostile NPCs)
+                if self.GetPreviewHealthColor then
+                    local r, g, b = self:GetPreviewHealthColor(false, nil, 1)  -- reaction 1 = hostile
+                    frame.Health:SetStatusBarColor(r, g, b)
+                else
+                    frame.Health:SetStatusBarColor(1, 0.1, 0.1)
+                end
                 frame.Health:Show()
             end
 
@@ -125,7 +143,10 @@ function Orbit.BossFramePreviewMixin:ApplyPreviewVisuals()
                 frame.Power:SetPoint("BOTTOMLEFT", 1, 1)
                 frame.Power:SetPoint("BOTTOMRIGHT", -1, 1)
                 frame.Power:SetHeight(height * POWER_BAR_HEIGHT_RATIO)
-                frame.Power:SetStatusBarTexture(texturePath)
+                
+                -- Use SkinStatusBar with isUnitFrame=true
+                Orbit.Skin:SkinStatusBar(frame.Power, textureName, nil, true)
+                
                 frame.Power:SetMinMaxValues(0, 100)
                 frame.Power:SetValue(PREVIEW_DEFAULTS.PowerPercent)
                 frame.Power:SetStatusBarColor(0, 0.5, 1) -- Blue for mana
@@ -135,14 +156,27 @@ function Orbit.BossFramePreviewMixin:ApplyPreviewVisuals()
             -- Preview name - ensure visible and OVERRIDE any unit data
             if frame.Name then
                 frame.Name:SetText("Boss " .. i)
-                frame.Name:SetTextColor(1, 1, 1, 1)
+                
+                -- Apply font color using shared helper (bosses are hostile)
+                if self.GetPreviewTextColor then
+                    local r, g, b, a = self:GetPreviewTextColor(false, nil, 1)  -- reaction 1 = hostile
+                    frame.Name:SetTextColor(r, g, b, a)
+                else
+                    frame.Name:SetTextColor(1, 0.1, 0.1, 1)
+                end
                 frame.Name:Show()
             end
 
             -- Preview health text - OVERRIDE UpdateHealthText
             if frame.HealthText then
                 frame.HealthText:SetText(PREVIEW_DEFAULTS.HealthPercent .. "%")
-                frame.HealthText:SetTextColor(1, 1, 1, 1)
+                -- Health text uses same font color logic as name
+                if self.GetPreviewTextColor then
+                    local r, g, b, a = self:GetPreviewTextColor(false, nil, 1)
+                    frame.HealthText:SetTextColor(r, g, b, a)
+                else
+                    frame.HealthText:SetTextColor(1, 0.1, 0.1, 1)
+                end
                 frame.HealthText:Show()
             end
 

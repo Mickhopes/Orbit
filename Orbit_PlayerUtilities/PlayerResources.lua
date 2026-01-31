@@ -37,6 +37,8 @@ local Plugin = Orbit:RegisterPlugin("Player Resources", SYSTEM_ID, {
         Hidden = false,
         Width = DEFAULTS.Width,
         Height = DEFAULTS.Height,
+        UseCustomColor = false,
+        BarColor = { r = 1, g = 1, b = 1, a = 1 },
     },
 }, Orbit.Constants.PluginGroups.CooldownManager)
 
@@ -89,6 +91,32 @@ function Plugin:AddSettings(dialog, systemFrame)
         { min = 5, max = 20, default = DEFAULTS.Height },
         nil
     )
+
+    -- Custom Color Toggle
+    table.insert(schema.controls, {
+        type = "checkbox",
+        key = "UseCustomColor",
+        label = "Use Custom Color",
+        default = false,
+        onChange = function(val)
+            self:SetSetting(systemIndex, "UseCustomColor", val)
+            self:ApplyButtonVisuals()
+            self:UpdatePower()
+        end,
+    })
+
+    -- Bar Color Picker
+    table.insert(schema.controls, {
+        type = "color",
+        key = "BarColor",
+        label = "Bar Color",
+        default = { r = 1, g = 1, b = 1, a = 1 },
+        onChange = function(color)
+            self:SetSetting(systemIndex, "BarColor", color)
+            self:ApplyButtonVisuals()
+            self:UpdatePower()
+        end,
+    })
 
     -- Note: Show Text is now controlled via Canvas Mode (drag Text to disabled dock)
 
@@ -212,19 +240,11 @@ function Plugin:OnLoad()
         Frame.StatusBarContainer = CreateFrame("Frame", nil, Frame, "BackdropTemplate")
         Frame.StatusBarContainer:SetAllPoints()
         Frame.StatusBarContainer:Hide()
+        -- Clear any backdrop from BackdropTemplate
+        Frame.StatusBarContainer:SetBackdrop(nil)
 
-        -- Background
-        local bg = Frame.StatusBarContainer:CreateTexture(nil, "BACKGROUND")
-        bg:SetAllPoints()
-
-        local color = self:GetSetting(SYSTEM_INDEX, "BackdropColour")
-        if color then
-            bg:SetColorTexture(color.r, color.g, color.b, color.a or 0.9)
-        else
-            local c = Orbit.Colors.Background
-            bg:SetColorTexture(c.r, c.g, c.b, c.a or 0.9)
-        end
-        Frame.StatusBarContainer.bg = bg
+        -- NOTE: Background is created by ClassBar:SkinStatusBar (container.orbitBg)
+        -- Do NOT create a second bg texture here or they will overlap and double the darkness!
 
         -- StatusBar itself
         Frame.StatusBar = CreateFrame("StatusBar", nil, Frame.StatusBarContainer)
@@ -234,11 +254,18 @@ function Plugin:OnLoad()
         Frame.StatusBar:SetValue(0)
         Frame.StatusBar:SetStatusBarTexture(LSM:Fetch("statusbar", "Melli"))
 
-        -- Apply default border using ClassBar skin
+        -- Apply default border using ClassBar skin (creates orbitBg for background)
         Orbit.Skin.ClassBar:SkinStatusBar(Frame.StatusBarContainer, Frame.StatusBar, { 
             borderSize = 1, 
             texture = "Melli" 
         })
+        
+        -- Apply Pixel Perfect
+        if OrbitEngine.Pixel then
+            OrbitEngine.Pixel:Enforce(Frame)
+            OrbitEngine.Pixel:Enforce(Frame.StatusBarContainer)
+            OrbitEngine.Pixel:Enforce(Frame.StatusBar)
+        end
     end
 
     -- Support for mergeBorders (propagate to StatusBarContainer if active)
@@ -265,7 +292,7 @@ function Plugin:OnLoad()
     Frame:RegisterEvent("UNIT_DISPLAYPOWER")
     Frame:RegisterEvent("RUNE_POWER_UPDATE")
     Frame:RegisterEvent("UPDATE_SHAPESHIFT_FORM")
-    Frame:RegisterUnitEvent("PLAYER_SPECIALIZATION_CHANGED", "player")
+    Frame:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
     Frame:RegisterUnitEvent("UNIT_MAXHEALTH", "player")
     Frame:RegisterUnitEvent("UNIT_AURA", "player")
 
@@ -483,6 +510,14 @@ function Plugin:ApplyButtonVisuals()
     if max < 1 then
         max = 1
     end
+    -- Get global backdrop color for buttons with robust fallback
+    local bgColor = Orbit.db.GlobalSettings and Orbit.db.GlobalSettings.BackdropColour
+    if not bgColor then
+        bgColor = Orbit.Constants and Orbit.Constants.Colors and Orbit.Constants.Colors.Background
+    end
+    if not bgColor then
+        bgColor = { r = 0.08, g = 0.08, b = 0.08, a = 0.5 }
+    end
 
     for i, btn in ipairs(Frame.buttons) do
         if btn:IsShown() then
@@ -490,6 +525,7 @@ function Plugin:ApplyButtonVisuals()
                 Orbit.Skin.ClassBar:SkinButton(btn, {
                     borderSize = borderSize,
                     texture = texture,
+                    backColor = bgColor,
                 })
             end
 
@@ -542,6 +578,14 @@ end
 
 -- [ RESOURCE COLOR HELPER ]-------------------------------------------------------------------------
 function Plugin:GetResourceColor(index, isCharged)
+    -- Check for custom color override first
+    local useCustomColor = self:GetSetting(SYSTEM_INDEX, "UseCustomColor")
+    local customColor = self:GetSetting(SYSTEM_INDEX, "BarColor")
+    
+    if useCustomColor and customColor then
+        return customColor
+    end
+
     local _, class = UnitClass("player")
     local colors = Orbit.Colors.PlayerResources
 
@@ -719,6 +763,8 @@ function Plugin:UpdateMaxPower()
     if not Frame.StatusBar then
         Frame.StatusBarContainer = CreateFrame("Frame", nil, Frame, "BackdropTemplate")
         Frame.StatusBarContainer:SetAllPoints()
+        -- Clear any backdrop from BackdropTemplate to prevent dark background behind buttons
+        Frame.StatusBarContainer:SetBackdrop(nil)
 
         Frame.StatusBar = CreateFrame("StatusBar", nil, Frame.StatusBarContainer)
         Frame.StatusBar:SetAllPoints()
@@ -753,31 +799,55 @@ function Plugin:UpdateMaxPower()
 
             btn.SetActive = function(self, active)
                 self.isActive = active
-                if self.orbitBar then
-                    if active then
+                if active then
+                    -- Show fill, hide progress bar immediately (no visual gap)
+                    if self.orbitBar then
                         self.orbitBar:Show()
-                        if self.Overlay then
-                            self.Overlay:Show()
-                        end
-                    else
-                        self.orbitBar:Hide()
-                        if self.Overlay then
-                            self.Overlay:Hide()
-                        end
                     end
+                    if self.Overlay then
+                        self.Overlay:Show()
+                    end
+                    if self.progressBar then
+                        self.progressBar:Hide()
+                    end
+                else
+                    -- Hide fill
+                    if self.orbitBar then
+                        self.orbitBar:Hide()
+                    end
+                    if self.Overlay then
+                        self.Overlay:Hide()
+                    end
+                    -- Progress bar visibility is controlled by SetFraction
                 end
             end
 
             btn.SetFraction = function(self, fraction)
                 if self.progressBar then
                     if fraction > 0 and fraction < 1 then
-                        self.progressBar:SetValue(fraction, SMOOTH_ANIM)
+                        self.progressBar:SetValue(fraction)
                         self.progressBar:Show()
                     else
                         self.progressBar:Hide()
                     end
                 end
             end
+        end
+    end
+
+    -- Hide excess buttons beyond current max (e.g., respeccing from Aug 6 to Dev 5)
+    for i = max + 1, #Frame.buttons do
+        local btn = Frame.buttons[i]
+        if btn then
+            btn:Hide()
+        end
+    end
+    
+    -- Show buttons up to current max (e.g., respeccing from Dev 5 to Aug 6)
+    for i = 1, max do
+        local btn = Frame.buttons[i]
+        if btn then
+            btn:Show()
         end
     end
 
@@ -807,28 +877,53 @@ function Plugin:UpdateLayout(frame)
 
     local height = settings.height or 15
     local spacing = settings.spacing or 2
-    local totalSpacing = (max - 1) * spacing
-    local btnWidth = (totalWidth - totalSpacing) / max
-
-    if OrbitEngine.Pixel then
-        local scale = Frame:GetEffectiveScale()
-        btnWidth = OrbitEngine.Pixel:Snap(btnWidth, scale)
-        height = OrbitEngine.Pixel:Snap(height, scale)
-        spacing = OrbitEngine.Pixel:Snap(spacing, scale)
+    
+    -- Pixel snapping helpers
+    local scale = Frame:GetEffectiveScale() or 1
+    local function SnapToPixel(value)
+        if OrbitEngine.Pixel then
+            return OrbitEngine.Pixel:Snap(value, scale)
+        end
+        return math.floor(value * scale + 0.5) / scale
     end
+    
+    -- Snap values
+    local snappedTotalWidth = SnapToPixel(totalWidth)
+    local snappedHeight = SnapToPixel(height)
+    local snappedSpacing = SnapToPixel(spacing)
 
     -- Physical Updates
-    Frame:SetHeight(height)
+    Frame:SetHeight(snappedHeight)
 
+    -- Calculate button boundaries based on percentage of total width
+    -- This prevents accumulated rounding errors from exceeding container width
+    local usableWidth = snappedTotalWidth - ((max - 1) * snappedSpacing)
+    
     for i = 1, max do
         local btn = buttons[i]
         if btn then
-            btn:SetSize(btnWidth, height)
-            btn:ClearAllPoints()
-            if i == 1 then
-                btn:SetPoint("LEFT", Frame, "LEFT", 0, 0)
+            -- Calculate this button's left edge position
+            -- Each button occupies: usableWidth/max + spacing (except last has no trailing spacing)
+            local btnUsableWidth = usableWidth / max
+            local leftPos = SnapToPixel((i - 1) * (btnUsableWidth + snappedSpacing))
+            
+            -- For the last button, ensure it ends exactly at container edge
+            local rightPos
+            if i == max then
+                rightPos = snappedTotalWidth
             else
-                btn:SetPoint("LEFT", buttons[i - 1], "RIGHT", spacing, 0)
+                rightPos = SnapToPixel(i * (btnUsableWidth + snappedSpacing) - snappedSpacing)
+            end
+            
+            local btnWidth = rightPos - leftPos
+            
+            btn:SetSize(btnWidth, snappedHeight)
+            btn:ClearAllPoints()
+            btn:SetPoint("LEFT", Frame, "LEFT", leftPos, 0)
+            
+            -- Apply Pixel:Enforce
+            if OrbitEngine.Pixel then
+                OrbitEngine.Pixel:Enforce(btn)
             end
         end
     end
@@ -1010,22 +1105,41 @@ function Plugin:UpdatePower()
                 local state, remaining, fraction = ResourceMixin:GetEssenceState(i, current, max)
 
                 if state == "full" then
-                    btn:SetActive(true)
-                    btn:SetFraction(0)
-
+                    -- Full: show orbitBar at full brightness, hide progress
                     if btn.orbitBar then
+                        btn.orbitBar:Show()
                         btn.orbitBar:SetVertexColor(color.r, color.g, color.b)
                     end
-                elseif state == "partial" then
-                    btn:SetActive(false)
-                    btn:SetFraction(fraction)
-
+                    if btn.Overlay then
+                        btn.Overlay:Show()
+                    end
                     if btn.progressBar then
-                        btn.progressBar:SetStatusBarColor(color.r * 0.5, color.g * 0.5, color.b * 0.5)
+                        btn.progressBar:Hide()
+                    end
+                elseif state == "partial" then
+                    -- Partial: show orbitBar at dimmed color underneath progress bar
+                    if btn.orbitBar then
+                        btn.orbitBar:Show()
+                        btn.orbitBar:SetVertexColor(color.r * 0.5, color.g * 0.5, color.b * 0.5)
+                    end
+                    if btn.Overlay then
+                        btn.Overlay:Hide()
+                    end
+                    btn:SetFraction(fraction)
+                    if btn.progressBar then
+                        btn.progressBar:SetStatusBarColor(color.r * 0.7, color.g * 0.7, color.b * 0.7)
                     end
                 else
-                    btn:SetActive(false)
-                    btn:SetFraction(0)
+                    -- Empty: hide orbitBar and progress
+                    if btn.orbitBar then
+                        btn.orbitBar:Hide()
+                    end
+                    if btn.Overlay then
+                        btn.Overlay:Hide()
+                    end
+                    if btn.progressBar then
+                        btn.progressBar:Hide()
+                    end
                 end
             end
         end
@@ -1105,9 +1219,9 @@ function Plugin:UpdatePower()
         return math.floor(value * scale + 0.5) / scale
     end
 
-    -- Calculate segment width (simple division of total width)
-    local btnWidth = totalWidth / max
+    -- Snap spacer width
     local snappedSpacerWidth = SnapToPixel(spacerWidth)
+    local snappedTotalWidth = SnapToPixel(totalWidth)
 
     if Frame.Spacers then
         for i = 1, 10 do
@@ -1119,12 +1233,18 @@ function Plugin:UpdatePower()
                     sp:SetWidth(snappedSpacerWidth)
                     sp:SetHeight(Frame:GetHeight())
 
-                    -- Position: Snap to exact pixel boundary based on percentage
-                    -- We center the spacer on the boundary to overlap nicely with the fill
-                    local centerPos = i * btnWidth
-                    local xPos = SnapToPixel(centerPos - (spacerWidth / 2))
+                    -- Position: Calculate exact boundary based on percentage of total width
+                    -- Snap the boundary position to ensure pixel-perfect alignment
+                    local boundaryPercent = i / max
+                    local centerPos = SnapToPixel(snappedTotalWidth * boundaryPercent)
+                    local xPos = SnapToPixel(centerPos - (snappedSpacerWidth / 2))
 
                     sp:SetPoint("LEFT", Frame, "LEFT", xPos, 0)
+                    
+                    -- Apply Pixel:Enforce if available
+                    if OrbitEngine.Pixel then
+                        OrbitEngine.Pixel:Enforce(sp)
+                    end
                 else
                     sp:Hide()
                 end

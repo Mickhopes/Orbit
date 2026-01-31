@@ -161,16 +161,18 @@ function Mixin:GetEssenceState(essenceIndex, currentEssence, maxEssence)
     local regenRate = GetPowerRegenForPowerType(Enum.PowerType.Essence) or 0.2
     local tickDuration = 5 / (5 / (1 / regenRate))
 
-    -- If we gained essence, reset timer
-    if currentEssence > essenceState.lastEssence then
+    -- If essence changed (gained or spent), handle timer
+    if currentEssence ~= essenceState.lastEssence then
         if currentEssence < maxEssence then
+            -- Start recharge timer from now
             essenceState.nextTick = now + tickDuration
         else
+            -- Full - no timer needed
             essenceState.nextTick = nil
         end
     end
 
-    -- If missing essence and no timer, start it
+    -- If missing essence and no timer, start it (fallback)
     if currentEssence < maxEssence and not essenceState.nextTick then
         essenceState.nextTick = now + tickDuration
     end
@@ -229,10 +231,8 @@ function Mixin:GetContinuousResourceForPlayer()
         return "STAGGER"
     end
 
-    -- Augmentation Evoker - Ebon Might
-    if class == "EVOKER" and specID == 1473 then
-        return "EBON_MIGHT"
-    end
+    -- NOTE: Augmentation Evoker Ebon Might is now handled by PlayerPower (mana bar)
+    -- PlayerResources will show Essence (discrete segments) like Devastation Evoker
 
     -- Demon Hunter - Soul Fragments (Devourer hero talent tree)
     -- Check if the DemonHunterSoulFragmentsBar exists and is being used

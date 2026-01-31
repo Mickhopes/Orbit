@@ -32,6 +32,8 @@ local Plugin = Orbit:RegisterPlugin("Player Power", SYSTEM_ID, {
         Hidden = false,
         Width = 200,
         Height = 15,
+        UseCustomColor = false,
+        BarColor = { r = 1, g = 1, b = 1, a = 1 },
     },
 }, Orbit.Constants.PluginGroups.UnitFrames)
 
@@ -80,6 +82,30 @@ function Plugin:AddSettings(dialog, systemFrame)
 
     -- Height
     WL:AddSizeSettings(self, schema, systemIndex, systemFrame, nil, { min = 5, max = 50, default = 15 }, nil)
+
+    -- Custom Color Toggle
+    table.insert(schema.controls, {
+        type = "checkbox",
+        key = "UseCustomColor",
+        label = "Use Custom Color",
+        default = false,
+        onChange = function(val)
+            self:SetSetting(systemIndex, "UseCustomColor", val)
+            self:UpdateAll()
+        end,
+    })
+
+    -- Bar Color Picker
+    table.insert(schema.controls, {
+        type = "color",
+        key = "BarColor",
+        label = "Bar Color",
+        default = { r = 1, g = 1, b = 1, a = 1 },
+        onChange = function(color)
+            self:SetSetting(systemIndex, "BarColor", color)
+            self:UpdateAll()
+        end,
+    })
 
     -- Note: Show Text is now controlled via Canvas Mode (drag Text to disabled dock)
 
@@ -152,6 +178,7 @@ function Plugin:OnLoad()
     Frame:RegisterUnitEvent("UNIT_MAXPOWER", "player")
     Frame:RegisterUnitEvent("UNIT_DISPLAYPOWER", "player")
     Frame:RegisterEvent("PLAYER_ENTERING_WORLD")
+    Frame:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
 
     Frame:SetScript("OnEvent", function(f, event)
         if event == "PLAYER_ENTERING_WORLD" then
@@ -265,7 +292,7 @@ function Plugin:ApplySettings()
     end
 
     -- Texture
-    Orbit.Skin:SkinStatusBar(PowerBar, textureName)
+    Orbit.Skin:SkinStatusBar(PowerBar, textureName, nil, true)
 
     -- Border
     Frame:SetBorder(borderSize)
@@ -321,6 +348,33 @@ function Plugin:UpdateAll()
         return
     end
 
+    -- Check for Augmentation Evoker Ebon Might (takes priority over normal power)
+    local _, class = UnitClass("player")
+    local spec = GetSpecialization()
+    local specID = spec and GetSpecializationInfo(spec)
+    
+    if class == "EVOKER" and specID == 1473 then
+        local current, max = Orbit.ResourceBarMixin:GetEbonMightState()
+        if current and max and max > 0 then
+            PowerBar:SetMinMaxValues(0, max)
+            PowerBar:SetValue(current, SMOOTH_ANIM)
+            
+            -- Use Ebon Might color
+            local color = Orbit.Colors.PlayerResources and Orbit.Colors.PlayerResources.EbonMight
+            if color then
+                PowerBar:SetStatusBarColor(color.r, color.g, color.b)
+            else
+                PowerBar:SetStatusBarColor(0.4, 0.6, 0.3) -- Fallback green
+            end
+            
+            if Frame.Text:IsShown() then
+                Frame.Text:SetFormattedText("%.0f", current)
+            end
+            return
+        end
+        -- If Ebon Might not active, fall through to show Mana
+    end
+
     local powerType, powerToken = UnitPowerType("player")
     local cur = UnitPower("player", powerType)
     local max = UnitPowerMax("player", powerType)
@@ -329,12 +383,19 @@ function Plugin:UpdateAll()
     PowerBar:SetValue(cur, SMOOTH_ANIM)
 
     -- Color
-    -- Use Orbit's centralized colors instead of Blizzard's global PowerBarColor
-    local info = Orbit.Constants.Colors.PowerType[powerType]
-    if info then
-        PowerBar:SetStatusBarColor(info.r, info.g, info.b)
+    local useCustomColor = self:GetSetting(SYSTEM_INDEX, "UseCustomColor")
+    local customColor = self:GetSetting(SYSTEM_INDEX, "BarColor")
+    
+    if useCustomColor and customColor then
+        PowerBar:SetStatusBarColor(customColor.r, customColor.g, customColor.b)
     else
-        PowerBar:SetStatusBarColor(0.5, 0.5, 0.5)
+        -- Use Orbit's centralized colors instead of Blizzard's global PowerBarColor
+        local info = Orbit.Constants.Colors.PowerType[powerType]
+        if info then
+            PowerBar:SetStatusBarColor(info.r, info.g, info.b)
+        else
+            PowerBar:SetStatusBarColor(0.5, 0.5, 0.5)
+        end
     end
 
     -- Text
