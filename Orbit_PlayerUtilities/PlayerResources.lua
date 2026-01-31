@@ -259,6 +259,13 @@ function Plugin:OnLoad()
             borderSize = 1, 
             texture = "Melli" 
         })
+        
+        -- Apply Pixel Perfect
+        if OrbitEngine.Pixel then
+            OrbitEngine.Pixel:Enforce(Frame)
+            OrbitEngine.Pixel:Enforce(Frame.StatusBarContainer)
+            OrbitEngine.Pixel:Enforce(Frame.StatusBar)
+        end
     end
 
     -- Support for mergeBorders (propagate to StatusBarContainer if active)
@@ -285,7 +292,7 @@ function Plugin:OnLoad()
     Frame:RegisterEvent("UNIT_DISPLAYPOWER")
     Frame:RegisterEvent("RUNE_POWER_UPDATE")
     Frame:RegisterEvent("UPDATE_SHAPESHIFT_FORM")
-    Frame:RegisterUnitEvent("PLAYER_SPECIALIZATION_CHANGED", "player")
+    Frame:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
     Frame:RegisterUnitEvent("UNIT_MAXHEALTH", "player")
     Frame:RegisterUnitEvent("UNIT_AURA", "player")
 
@@ -820,6 +827,14 @@ function Plugin:UpdateMaxPower()
         end
     end
 
+    -- Hide excess buttons beyond current max (e.g., respeccing from Aug 6 to Dev 5)
+    for i = max + 1, #Frame.buttons do
+        local btn = Frame.buttons[i]
+        if btn then
+            btn:Hide()
+        end
+    end
+
     self:ApplySettings()
 end
 
@@ -846,28 +861,53 @@ function Plugin:UpdateLayout(frame)
 
     local height = settings.height or 15
     local spacing = settings.spacing or 2
-    local totalSpacing = (max - 1) * spacing
-    local btnWidth = (totalWidth - totalSpacing) / max
-
-    if OrbitEngine.Pixel then
-        local scale = Frame:GetEffectiveScale()
-        btnWidth = OrbitEngine.Pixel:Snap(btnWidth, scale)
-        height = OrbitEngine.Pixel:Snap(height, scale)
-        spacing = OrbitEngine.Pixel:Snap(spacing, scale)
+    
+    -- Pixel snapping helpers
+    local scale = Frame:GetEffectiveScale() or 1
+    local function SnapToPixel(value)
+        if OrbitEngine.Pixel then
+            return OrbitEngine.Pixel:Snap(value, scale)
+        end
+        return math.floor(value * scale + 0.5) / scale
     end
+    
+    -- Snap values
+    local snappedTotalWidth = SnapToPixel(totalWidth)
+    local snappedHeight = SnapToPixel(height)
+    local snappedSpacing = SnapToPixel(spacing)
 
     -- Physical Updates
-    Frame:SetHeight(height)
+    Frame:SetHeight(snappedHeight)
 
+    -- Calculate button boundaries based on percentage of total width
+    -- This prevents accumulated rounding errors from exceeding container width
+    local usableWidth = snappedTotalWidth - ((max - 1) * snappedSpacing)
+    
     for i = 1, max do
         local btn = buttons[i]
         if btn then
-            btn:SetSize(btnWidth, height)
-            btn:ClearAllPoints()
-            if i == 1 then
-                btn:SetPoint("LEFT", Frame, "LEFT", 0, 0)
+            -- Calculate this button's left edge position
+            -- Each button occupies: usableWidth/max + spacing (except last has no trailing spacing)
+            local btnUsableWidth = usableWidth / max
+            local leftPos = SnapToPixel((i - 1) * (btnUsableWidth + snappedSpacing))
+            
+            -- For the last button, ensure it ends exactly at container edge
+            local rightPos
+            if i == max then
+                rightPos = snappedTotalWidth
             else
-                btn:SetPoint("LEFT", buttons[i - 1], "RIGHT", spacing, 0)
+                rightPos = SnapToPixel(i * (btnUsableWidth + snappedSpacing) - snappedSpacing)
+            end
+            
+            local btnWidth = rightPos - leftPos
+            
+            btn:SetSize(btnWidth, snappedHeight)
+            btn:ClearAllPoints()
+            btn:SetPoint("LEFT", Frame, "LEFT", leftPos, 0)
+            
+            -- Apply Pixel:Enforce
+            if OrbitEngine.Pixel then
+                OrbitEngine.Pixel:Enforce(btn)
             end
         end
     end
@@ -1144,9 +1184,9 @@ function Plugin:UpdatePower()
         return math.floor(value * scale + 0.5) / scale
     end
 
-    -- Calculate segment width (simple division of total width)
-    local btnWidth = totalWidth / max
+    -- Snap spacer width
     local snappedSpacerWidth = SnapToPixel(spacerWidth)
+    local snappedTotalWidth = SnapToPixel(totalWidth)
 
     if Frame.Spacers then
         for i = 1, 10 do
@@ -1158,12 +1198,18 @@ function Plugin:UpdatePower()
                     sp:SetWidth(snappedSpacerWidth)
                     sp:SetHeight(Frame:GetHeight())
 
-                    -- Position: Snap to exact pixel boundary based on percentage
-                    -- We center the spacer on the boundary to overlap nicely with the fill
-                    local centerPos = i * btnWidth
-                    local xPos = SnapToPixel(centerPos - (spacerWidth / 2))
+                    -- Position: Calculate exact boundary based on percentage of total width
+                    -- Snap the boundary position to ensure pixel-perfect alignment
+                    local boundaryPercent = i / max
+                    local centerPos = SnapToPixel(snappedTotalWidth * boundaryPercent)
+                    local xPos = SnapToPixel(centerPos - (snappedSpacerWidth / 2))
 
                     sp:SetPoint("LEFT", Frame, "LEFT", xPos, 0)
+                    
+                    -- Apply Pixel:Enforce if available
+                    if OrbitEngine.Pixel then
+                        OrbitEngine.Pixel:Enforce(sp)
+                    end
                 else
                     sp:Hide()
                 end

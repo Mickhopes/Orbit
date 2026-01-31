@@ -229,10 +229,8 @@ function Mixin:GetContinuousResourceForPlayer()
         return "STAGGER"
     end
 
-    -- Augmentation Evoker - Ebon Might
-    if class == "EVOKER" and specID == 1473 then
-        return "EBON_MIGHT"
-    end
+    -- NOTE: Augmentation Evoker Ebon Might is now handled by PlayerPower (mana bar)
+    -- PlayerResources will show Essence (discrete segments) like Devastation Evoker
 
     -- Demon Hunter - Soul Fragments (Devourer hero talent tree)
     -- Check if the DemonHunterSoulFragmentsBar exists and is being used

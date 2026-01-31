@@ -178,6 +178,7 @@ function Plugin:OnLoad()
     Frame:RegisterUnitEvent("UNIT_MAXPOWER", "player")
     Frame:RegisterUnitEvent("UNIT_DISPLAYPOWER", "player")
     Frame:RegisterEvent("PLAYER_ENTERING_WORLD")
+    Frame:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
 
     Frame:SetScript("OnEvent", function(f, event)
         if event == "PLAYER_ENTERING_WORLD" then
@@ -345,6 +346,33 @@ function Plugin:UpdateAll()
     end
     if not Frame:IsShown() then
         return
+    end
+
+    -- Check for Augmentation Evoker Ebon Might (takes priority over normal power)
+    local _, class = UnitClass("player")
+    local spec = GetSpecialization()
+    local specID = spec and GetSpecializationInfo(spec)
+    
+    if class == "EVOKER" and specID == 1473 then
+        local current, max = Orbit.ResourceBarMixin:GetEbonMightState()
+        if current and max and max > 0 then
+            PowerBar:SetMinMaxValues(0, max)
+            PowerBar:SetValue(current, SMOOTH_ANIM)
+            
+            -- Use Ebon Might color
+            local color = Orbit.Colors.PlayerResources and Orbit.Colors.PlayerResources.EbonMight
+            if color then
+                PowerBar:SetStatusBarColor(color.r, color.g, color.b)
+            else
+                PowerBar:SetStatusBarColor(0.4, 0.6, 0.3) -- Fallback green
+            end
+            
+            if Frame.Text:IsShown() then
+                Frame.Text:SetFormattedText("%.0f", current)
+            end
+            return
+        end
+        -- If Ebon Might not active, fall through to show Mana
     end
 
     local powerType, powerToken = UnitPowerType("player")
