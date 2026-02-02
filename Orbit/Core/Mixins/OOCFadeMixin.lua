@@ -91,7 +91,6 @@ local function UpdateFrameVisibility(frame, fadeEnabled, data)
         if includeChildren then
             SetFrameMouseEnabled(frame, false, true)
         end
-        -- Note: when enableHover is true, we don't disable mouse at all
     end
 end
 
@@ -133,7 +132,8 @@ if EditModeManagerFrame then
     end)
 end
 
--- Hook CooldownViewerSettings show/hide (created later, use timer to find it)
+-- Hook CooldownViewerSettings show/hide
+-- Delay 2s to ensure addon load order - CooldownViewerSettings is created late
 C_Timer.After(2, function()
     if CooldownViewerSettings then
         CooldownViewerSettings:HookScript("OnShow", function()
@@ -174,11 +174,7 @@ function Mixin:ApplyOOCFade(frame, plugin, systemIndex, settingKey, enableHover)
             if data then
                 local fadeEnabled = data.plugin:GetSetting(data.systemIndex, data.settingKey)
                 if fadeEnabled then
-                    if Orbit.Animation and Orbit.Animation.FadeIn then
-                        Orbit.Animation:FadeIn(self, 0.15)
-                    else
-                        self:SetAlpha(1)
-                    end
+                    self:SetAlpha(1)
                 end
             end
         end)
