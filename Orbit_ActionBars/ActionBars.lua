@@ -7,6 +7,7 @@ local Constants = Orbit.Constants
 local BUTTON_SIZE = 36
 
 -- [ CONSTANTS ]-------------------------------------------------------------------------------------
+local PET_BAR_INDEX = 9
 local STANCE_BAR_INDEX = 10
 local POSSESS_BAR_INDEX = 11
 local EXTRA_BAR_INDEX = 12
@@ -904,8 +905,12 @@ function Plugin:CreateContainer(config)
 
     -- Visibility Driver
     -- Always hide in Pet Battle or Vehicle UI (Standard & Special bars)
-    -- Special bars might have additional logic, but for now we apply this global rule
-    RegisterStateDriver(frame, "visibility", VISIBILITY_DRIVER)
+    -- Pet Bar (index 9) has additional logic: only show when player has an active pet
+    if config.index == PET_BAR_INDEX then
+        RegisterStateDriver(frame, "visibility", "[petbattle][vehicleui] hide; [nopet] hide; show")
+    else
+        RegisterStateDriver(frame, "visibility", VISIBILITY_DRIVER)
+    end
 
     -- Attach to Orbit's frame system
     OrbitEngine.Frame:AttachSettingsListener(frame, self, config.index)
@@ -997,8 +1002,8 @@ function Plugin:CreateContainer(config)
 
     frame:Show()
 
-    -- Apply Out of Combat Fade
-    if Orbit.OOCFadeMixin then
+    -- Apply Out of Combat Fade (skip for Pet Bar - it has pet-based visibility, not combat-based)
+    if Orbit.OOCFadeMixin and config.index ~= PET_BAR_INDEX then
         Orbit.OOCFadeMixin:ApplyOOCFade(frame, self, config.index, "OutOfCombatFade")
     end
 

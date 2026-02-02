@@ -34,11 +34,37 @@ local function ShouldShowFrame(frame)
     return inCombat or hasTarget or mouseOver
 end
 
-local function UpdateFrameVisibility(frame, fadeEnabled)
+-- Helper to enable/disable mouse on a frame and optionally its children
+-- When enableHover is true, we only toggle the parent frame so hover detection works
+local function SetFrameMouseEnabled(frame, enabled, includeChildren)
     if not frame then return end
+    
+    if frame.EnableMouse then
+        frame:EnableMouse(enabled)
+    end
+    
+    -- Only toggle children when explicitly requested (hover reveal needs children to pass through)
+    if includeChildren then
+        local children = { frame:GetChildren() }
+        for _, child in ipairs(children) do
+            if child.EnableMouse then
+                child:EnableMouse(enabled)
+            end
+        end
+    end
+end
+
+local function UpdateFrameVisibility(frame, fadeEnabled, data)
+    if not frame then return end
+    
+    -- Determine if we should include children in mouse toggle
+    -- When enableHover is true, we DON'T touch children so hover detection works
+    local includeChildren = data and not data.enableHover
     
     -- If fade is disabled, do nothing - let the Opacity slider / ApplyHoverFade handle alpha
     if not fadeEnabled then
+        -- Ensure mouse is re-enabled when fade is disabled
+        SetFrameMouseEnabled(frame, true, includeChildren)
         return
     end
     
@@ -51,12 +77,19 @@ local function UpdateFrameVisibility(frame, fadeEnabled)
         else
             frame:SetAlpha(1)
         end
+        -- Re-enable mouse when visible
+        SetFrameMouseEnabled(frame, true, includeChildren)
     else
         if Orbit.Animation and Orbit.Animation.FadeOut then
             Orbit.Animation:FadeOut(frame, 0.5, 0)  -- Fade to 0 alpha
         else
             frame:SetAlpha(0)
         end
+        -- Disable mouse when hidden (unless hover is enabled for reveal)
+        if includeChildren then
+            SetFrameMouseEnabled(frame, false, true)
+        end
+        -- Note: when enableHover is true, we don't disable mouse at all
     end
 end
 
@@ -67,7 +100,7 @@ local function UpdateAllFrames()
         local settingKey = data.settingKey or "OutOfCombatFade"
         
         local fadeEnabled = plugin and plugin.GetSetting and plugin:GetSetting(systemIndex, settingKey)
-        UpdateFrameVisibility(frame, fadeEnabled)
+        UpdateFrameVisibility(frame, fadeEnabled, data)
     end
 end
 
@@ -146,7 +179,7 @@ function Mixin:ApplyOOCFade(frame, plugin, systemIndex, settingKey, enableHover)
             local data = ManagedFrames[self]
             if data then
                 local fadeEnabled = data.plugin:GetSetting(data.systemIndex, data.settingKey)
-                UpdateFrameVisibility(self, fadeEnabled)
+                UpdateFrameVisibility(self, fadeEnabled, data)
             end
         end)
         frame.orbitOOCHoverHooked = true
@@ -173,7 +206,7 @@ function Mixin:ApplyOOCFade(frame, plugin, systemIndex, settingKey, enableHover)
     
     -- Apply current visibility state
     local fadeEnabled = plugin:GetSetting(systemIndex, settingKey)
-    UpdateFrameVisibility(frame, fadeEnabled)
+    UpdateFrameVisibility(frame, fadeEnabled, ManagedFrames[frame])
 end
 
 --- Remove OOC Fade behavior from a frame
@@ -182,6 +215,7 @@ function Mixin:RemoveOOCFade(frame)
     if frame then
         ManagedFrames[frame] = nil
         frame:SetAlpha(1)  -- Restore visibility
+        SetFrameMouseEnabled(frame, true, true)  -- Restore interactivity (including children)
     end
 end
 
