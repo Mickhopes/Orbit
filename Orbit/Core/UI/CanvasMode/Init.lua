@@ -80,13 +80,11 @@ Dialog:SetScript("OnEvent", function(self, event)
 end)
 
 -- [ TITLE ]--------------------------------------------------------------------------------------
-
 Dialog.Title = Dialog:CreateFontString(nil, "ARTWORK", "GameFontHighlightLarge")
 Dialog.Title:SetPoint("TOP", Dialog, "TOP", 0, -15)
 Dialog.Title:SetText("Canvas Mode")
 
 -- [ CLOSE BUTTON ]------------------------------------------------------------------------------
-
 Dialog.CloseButton = CreateFrame("Button", nil, Dialog, "UIPanelCloseButton")
 Dialog.CloseButton:SetPoint("TOPRIGHT", Dialog, "TOPRIGHT", -2, -2)
 Dialog.CloseButton:SetScript("OnClick", function()
@@ -94,7 +92,6 @@ Dialog.CloseButton:SetScript("OnClick", function()
 end)
 
 -- [ STATE ]--------------------------------------------------------------------------------------
-
 -- Zoom/Pan state
 Dialog.zoomLevel = C.DEFAULT_ZOOM
 Dialog.panOffsetX = 0

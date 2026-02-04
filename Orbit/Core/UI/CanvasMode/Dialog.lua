@@ -599,11 +599,12 @@ function Dialog:Apply()
         end
     end
 
+    -- Apply settings to the specific frame that was edited
+    local targetFrame = self.targetFrame
     self:CloseDialog()
 
-    -- Apply settings (will refresh all bars, using global positions for synced ones)
     if plugin.ApplySettings then
-        plugin:ApplySettings()
+        plugin:ApplySettings(targetFrame)
     end
 
     -- For Action Bars, refresh all bars to pick up global changes

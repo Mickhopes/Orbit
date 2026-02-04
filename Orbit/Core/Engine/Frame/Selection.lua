@@ -293,6 +293,11 @@ function Selection:Attach(frame, dragCallback, selectionCallback)
         GameTooltip:SetOwner(self, anchor)
         GameTooltip:AddLine(self:GetLabelText(), 1, 0.82, 0)
         GameTooltip:AddLine(EDIT_MODE_CLICK_TO_EDIT, 1, 1, 1)
+        if self.parent and self.parent.editModeTooltipLines then
+            for _, line in ipairs(self.parent.editModeTooltipLines) do
+                GameTooltip:AddLine(line, 0.8, 0.8, 0.8)
+            end
+        end
         GameTooltip:Show()
     end
 

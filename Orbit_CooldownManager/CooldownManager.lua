@@ -9,6 +9,7 @@ local LibCustomGlow = LibStub("LibCustomGlow-1.0", true)
 local ESSENTIAL_INDEX = Constants.Cooldown.SystemIndex.Essential
 local UTILITY_INDEX = Constants.Cooldown.SystemIndex.Utility
 local BUFFICON_INDEX = Constants.Cooldown.SystemIndex.BuffIcon
+local TRACKED_INDEX = Constants.Cooldown.SystemIndex.Tracked
 local VIEWER_MAP = {}
 
 local Plugin = Orbit:RegisterPlugin("Cooldown Manager", "Orbit_CooldownViewer", {
@@ -21,26 +22,26 @@ local Plugin = Orbit:RegisterPlugin("Cooldown Manager", "Orbit_CooldownViewer", 
         Orientation = 0,
         IconLimit = Constants.Cooldown.DefaultLimit,
         ShowGCDSwipe = true,
-        -- Component visibility (Keybind disabled by default)
         DisabledComponents = { "Keybind" },
-        -- Default component positions for Reset functionality
         ComponentPositions = {
             Timer = { anchorX = "CENTER", anchorY = "CENTER", offsetX = 0, offsetY = 0, justifyH = "CENTER" },
             Stacks = { anchorX = "LEFT", anchorY = "BOTTOM", offsetX = 2, offsetY = 2, justifyH = "LEFT" },
             Charges = { anchorX = "RIGHT", anchorY = "BOTTOM", offsetX = 2, offsetY = 2, justifyH = "RIGHT" },
             Keybind = { anchorX = "RIGHT", anchorY = "TOP", offsetX = 2, offsetY = 2, justifyH = "RIGHT" },
         },
-        -- Glow Settings (use PandemicGlow constants for consistency)
         PandemicGlowType = Constants.PandemicGlow.DefaultType,
         PandemicGlowColor = Constants.PandemicGlow.DefaultColor,
         ProcGlowType = Constants.PandemicGlow.DefaultType,
         ProcGlowColor = Constants.PandemicGlow.DefaultColor,
         OutOfCombatFade = false,
         ShowOnMouseover = true,
+        TrackedItems = {},
     },
 }, Orbit.Constants.PluginGroups.CooldownManager)
 
 Plugin.canvasMode = true
+Plugin.viewerMap = VIEWER_MAP
+
 
 -- [ SETTINGS UI ]-----------------------------------------------------------------------------------
 function Plugin:AddSettings(dialog, systemFrame)
@@ -49,37 +50,26 @@ function Plugin:AddSettings(dialog, systemFrame)
 
     local frame = self:GetFrameBySystemIndex(systemIndex)
     local isAnchored = frame and OrbitEngine.Frame:GetAnchorParent(frame) ~= nil
+    local isTracked = frame and frame.isTrackedBar
 
     local schema = {
         hideNativeSettings = true,
         controls = {},
-        extraButtons = {
-            {
-                text = "Cooldown Settings",
-                callback = function()
-                    if EditModeManagerFrame and EditModeManagerFrame:IsShown() then
-                        HideUIPanel(EditModeManagerFrame)
-                    end
-                    if CooldownViewerSettings then
-                        CooldownViewerSettings:Show()
-                    end
-                end,
-            },
-        },
+        extraButtons = {},
     }
 
-    -- 1. Orientation (hide when anchored - orientation becomes fixed by anchor)
-    if not isAnchored then
-        WL:AddOrientationSettings(self, schema, systemIndex, dialog, systemFrame, {
-            options = {
-                { text = "Horizontal", value = 0 },
-                { text = "Vertical", value = 1 },
-            },
-            default = 0,
+    if not isTracked then
+        table.insert(schema.extraButtons, {
+            text = "Cooldown Settings",
+            callback = function()
+                if EditModeManagerFrame and EditModeManagerFrame:IsShown() then HideUIPanel(EditModeManagerFrame) end
+                if CooldownViewerSettings then CooldownViewerSettings:Show() end
+            end,
         })
     end
 
-    -- 2. Icon Aspect Ratio
+    if not isAnchored then end
+
     table.insert(schema.controls, {
         type = "dropdown",
         key = "aspectRatio",
@@ -93,14 +83,12 @@ function Plugin:AddSettings(dialog, systemFrame)
         default = "1:1",
     })
 
-    -- 3. Icon Size (Scale as %)
     WL:AddSizeSettings(self, schema, systemIndex, systemFrame, nil, nil, {
         key = "IconSize",
         label = "Scale",
         default = Constants.Cooldown.DefaultIconSize,
     })
 
-    -- 4. Icon Padding
     table.insert(schema.controls, {
         type = "slider",
         key = "IconPadding",
@@ -111,26 +99,24 @@ function Plugin:AddSettings(dialog, systemFrame)
         default = Constants.Cooldown.DefaultPadding,
     })
 
+    if not isTracked then
+        table.insert(schema.controls, {
+            type = "slider",
+            key = "IconLimit",
+            label = "# Columns",
+            min = 1,
+            max = 20,
+            step = 1,
+            default = Constants.Cooldown.DefaultLimit,
+        })
+    end
 
-    -- 6. Columns
-    table.insert(schema.controls, {
-        type = "slider",
-        key = "IconLimit",
-        label = "# Columns",
-        min = 1,
-        max = 20,
-        step = 1,
-        default = Constants.Cooldown.DefaultLimit,
-    })
-
-    -- 7. Swipe Color
     WL:AddColorSettings(self, schema, systemIndex, systemFrame, {
         key = "SwipeColor",
         label = "Swipe Colour",
         default = { r = 0, g = 0, b = 0, a = 0.8 },
     }, nil)
 
-    -- 8. Show GCD Swipe
     table.insert(schema.controls, {
         type = "checkbox",
         key = "ShowGCDSwipe",
@@ -138,52 +124,49 @@ function Plugin:AddSettings(dialog, systemFrame)
         default = true,
     })
 
-    -- Pandemic Glow Type
-    local GlowType = Constants.PandemicGlow.Type
-    table.insert(schema.controls, {
-        type = "dropdown",
-        key = "PandemicGlowType",
-        label = "Pandemic Glow",
-        options = {
-            { text = "None", value = GlowType.None },
-            { text = "Pixel Glow", value = GlowType.Pixel },
-            { text = "Proc Glow", value = GlowType.Proc },
-            { text = "Autocast Shine", value = GlowType.Autocast },
-            { text = "Button Glow", value = GlowType.Button },
-        },
-        default = Constants.PandemicGlow.DefaultType,
-    })
+    if not isTracked then
+        local GlowType = Constants.PandemicGlow.Type
+        table.insert(schema.controls, {
+            type = "dropdown",
+            key = "PandemicGlowType",
+            label = "Pandemic Glow",
+            options = {
+                { text = "None", value = GlowType.None },
+                { text = "Pixel Glow", value = GlowType.Pixel },
+                { text = "Proc Glow", value = GlowType.Proc },
+                { text = "Autocast Shine", value = GlowType.Autocast },
+                { text = "Button Glow", value = GlowType.Button },
+            },
+            default = Constants.PandemicGlow.DefaultType,
+        })
 
-    -- Pandemic Glow Color
-    WL:AddColorSettings(self, schema, systemIndex, systemFrame, {
-        key = "PandemicGlowColor",
-        label = "Pandemic Glow Colour",
-        default = Constants.PandemicGlow.DefaultColor,
-    }, nil)
+        WL:AddColorSettings(self, schema, systemIndex, systemFrame, {
+            key = "PandemicGlowColor",
+            label = "Pandemic Glow Colour",
+            default = Constants.PandemicGlow.DefaultColor,
+        }, nil)
 
-    -- Proc Glow Type (spell activation overlays)
-    table.insert(schema.controls, {
-        type = "dropdown",
-        key = "ProcGlowType",
-        label = "Proc Glow",
-        options = {
-            { text = "None", value = GlowType.None },
-            { text = "Pixel Glow", value = GlowType.Pixel },
-            { text = "Proc Glow", value = GlowType.Proc },
-            { text = "Autocast Shine", value = GlowType.Autocast },
-            { text = "Button Glow", value = GlowType.Button },
-        },
-        default = Constants.PandemicGlow.DefaultType,
-    })
+        table.insert(schema.controls, {
+            type = "dropdown",
+            key = "ProcGlowType",
+            label = "Proc Glow",
+            options = {
+                { text = "None", value = GlowType.None },
+                { text = "Pixel Glow", value = GlowType.Pixel },
+                { text = "Proc Glow", value = GlowType.Proc },
+                { text = "Autocast Shine", value = GlowType.Autocast },
+                { text = "Button Glow", value = GlowType.Button },
+            },
+            default = Constants.PandemicGlow.DefaultType,
+        })
 
-    -- Proc Glow Color
-    WL:AddColorSettings(self, schema, systemIndex, systemFrame, {
-        key = "ProcGlowColor",
-        label = "Proc Glow Colour",
-        default = Constants.PandemicGlow.DefaultColor,
-    }, nil)
+        WL:AddColorSettings(self, schema, systemIndex, systemFrame, {
+            key = "ProcGlowColor",
+            label = "Proc Glow Colour",
+            default = Constants.PandemicGlow.DefaultColor,
+        }, nil)
+    end
 
-    -- Out of Combat Fade
     table.insert(schema.controls, {
         type = "checkbox",
         key = "OutOfCombatFade",
@@ -192,9 +175,7 @@ function Plugin:AddSettings(dialog, systemFrame)
         tooltip = "Hide frame when out of combat with no target",
         onChange = function(val)
             self:SetSetting(systemIndex, "OutOfCombatFade", val)
-            if Orbit.OOCFadeMixin then
-                Orbit.OOCFadeMixin:RefreshAll()
-            end
+            if Orbit.OOCFadeMixin then Orbit.OOCFadeMixin:RefreshAll() end
             OrbitEngine.Layout:Reset(dialog)
             self:AddSettings(dialog, systemFrame)
         end,
@@ -210,9 +191,12 @@ function Plugin:AddSettings(dialog, systemFrame)
             onChange = function(val)
                 self:SetSetting(systemIndex, "ShowOnMouseover", val)
                 local data = VIEWER_MAP[systemIndex]
-                if data and data.viewer and Orbit.OOCFadeMixin then
-                    Orbit.OOCFadeMixin:ApplyOOCFade(data.viewer, self, systemIndex, "OutOfCombatFade", val)
-                    Orbit.OOCFadeMixin:RefreshAll()
+                if data then
+                    local target = data.isTracked and data.anchor or data.viewer
+                    if target and Orbit.OOCFadeMixin then
+                        Orbit.OOCFadeMixin:ApplyOOCFade(target, self, systemIndex, "OutOfCombatFade", val)
+                        Orbit.OOCFadeMixin:RefreshAll()
+                    end
                 end
             end,
         })
@@ -226,32 +210,40 @@ function Plugin:OnLoad()
     self.essentialAnchor = self:CreateAnchor("OrbitEssentialCooldowns", ESSENTIAL_INDEX, "Essential Cooldowns")
     self.utilityAnchor = self:CreateAnchor("OrbitUtilityCooldowns", UTILITY_INDEX, "Utility Cooldowns")
     self.buffIconAnchor = self:CreateAnchor("OrbitBuffIconCooldowns", BUFFICON_INDEX, "Buff Icons")
+    self.trackedAnchor = self:CreateTrackedAnchor("OrbitTrackedCooldowns", TRACKED_INDEX, "Tracked Cooldowns")
 
-    -- Populate viewer map after anchors are created
     VIEWER_MAP = {
         [ESSENTIAL_INDEX] = { viewer = EssentialCooldownViewer, anchor = self.essentialAnchor },
         [UTILITY_INDEX] = { viewer = UtilityCooldownViewer, anchor = self.utilityAnchor },
         [BUFFICON_INDEX] = { viewer = BuffIconCooldownViewer, anchor = self.buffIconAnchor },
+        [TRACKED_INDEX] = { viewer = nil, anchor = self.trackedAnchor, isTracked = true },
     }
+    self.viewerMap = VIEWER_MAP
 
-    -- Setup Canvas Mode previews for each anchor
     self:SetupCanvasPreview(self.essentialAnchor, ESSENTIAL_INDEX)
     self:SetupCanvasPreview(self.utilityAnchor, UTILITY_INDEX)
     self:SetupCanvasPreview(self.buffIconAnchor, BUFFICON_INDEX)
+    self:SetupTrackedCanvasPreview(self.trackedAnchor, TRACKED_INDEX)
 
-    -- Hook Blizzard viewers for layout sync
+    self:RestoreChildFrames()
     self:HookBlizzardViewers()
+    self:StartTrackedUpdateTicker()
+    self:RegisterCursorWatcher()
+    self:SetupTrackedKeyboardHook()
 
     Orbit.EventBus:On("PLAYER_ENTERING_WORLD", self.OnPlayerEnteringWorld, self)
     self:RegisterVisibilityEvents()
 
-    -- Apply OOC Fade to Blizzard viewer frames (SetAlpha hook prevents external overrides)
     Orbit.EventBus:On("PLAYER_ENTERING_WORLD", function()
         if Orbit.OOCFadeMixin then
             for systemIndex, data in pairs(VIEWER_MAP) do
                 if data.viewer then
                     local enableHover = self:GetSetting(systemIndex, "ShowOnMouseover") ~= false
                     Orbit.OOCFadeMixin:ApplyOOCFade(data.viewer, self, systemIndex, "OutOfCombatFade", enableHover)
+                end
+                if data.isTracked and data.anchor then
+                    local enableHover = self:GetSetting(systemIndex, "ShowOnMouseover") ~= false
+                    Orbit.OOCFadeMixin:ApplyOOCFade(data.anchor, self, systemIndex, "OutOfCombatFade", enableHover)
                 end
             end
             Orbit.OOCFadeMixin:RefreshAll()
@@ -261,14 +253,11 @@ end
 
 function Plugin:CreateAnchor(name, systemIndex, label)
     local frame = CreateFrame("Frame", name, UIParent)
-    frame:SetSize(40, 40) -- Starting size
-    frame:SetClampedToScreen(true) -- Prevent dragging off-screen
+    frame:SetSize(40, 40)
+    frame:SetClampedToScreen(true)
     frame.systemIndex = systemIndex
     frame.editModeName = label
-
     frame:EnableMouse(true)
-
-    -- Enable anchoring in any direction
     frame.anchorOptions = { horizontal = true, vertical = true, syncScale = false, syncDimensions = false }
     OrbitEngine.Frame:AttachSettingsListener(frame, self, systemIndex)
 
@@ -286,23 +275,19 @@ function Plugin:CreateAnchor(name, systemIndex, label)
         end
     end
 
-    -- Callback for when anchor state changes - refresh layout to update growth direction
     frame.OnAnchorChanged = function(self, parent, edge, padding)
         Plugin:ProcessChildren(self)
     end
-
     self:ApplySettings(frame)
-
     return frame
 end
+
 
 function Plugin:IsComponentDisabled(componentKey, systemIndex)
     systemIndex = systemIndex or 1
     local disabled = self:GetSetting(systemIndex, "DisabledComponents") or {}
     for _, key in ipairs(disabled) do
-        if key == componentKey then
-            return true
-        end
+        if key == componentKey then return true end
     end
     return false
 end
@@ -471,6 +456,7 @@ function Plugin:SetupCanvasPreview(anchor, systemIndex)
         return preview
     end
 end
+
 
 function Plugin:HookBlizzardViewers()
     for _, entry in pairs(VIEWER_MAP) do
@@ -1416,57 +1402,41 @@ end
 function Plugin:ApplyAll()
     self:ReapplyParentage()
 
-    if self.essentialAnchor then
-        self:ApplySettings(self.essentialAnchor)
-    end
-    if self.utilityAnchor then
-        self:ApplySettings(self.utilityAnchor)
-    end
-    if self.buffIconAnchor then
-        self:ApplySettings(self.buffIconAnchor)
-    end
+    if self.essentialAnchor then self:ApplySettings(self.essentialAnchor) end
+    if self.utilityAnchor then self:ApplySettings(self.utilityAnchor) end
+    if self.buffIconAnchor then self:ApplySettings(self.buffIconAnchor) end
+    if self.trackedAnchor then self:ApplyTrackedSettings(self.trackedAnchor) end
 end
 
 function Plugin:ApplySettings(frame)
-    -- If called without a specific frame (e.g. from ProfileManager or Init), apply to all
     if not frame then
         self:ApplyAll()
         return
     end
-
-    if InCombatLockdown() then
-        return
-    end
-    if (C_PetBattles and C_PetBattles.IsInBattle()) or (UnitHasVehicleUI and UnitHasVehicleUI("player")) then
-        return
-    end
+    if InCombatLockdown() then return end
+    if (C_PetBattles and C_PetBattles.IsInBattle()) or (UnitHasVehicleUI and UnitHasVehicleUI("player")) then return end
 
     local systemIndex = frame.systemIndex
     local resolvedFrame = self:GetFrameBySystemIndex(systemIndex)
-    if resolvedFrame then
-        frame = resolvedFrame
-    end
-    if not frame or not frame.SetScale then
+    if resolvedFrame then frame = resolvedFrame end
+    if not frame or not frame.SetScale then return end
+
+    if frame.isTrackedBar then
+        self:ApplyTrackedSettings(frame)
         return
     end
 
     local size, alpha = self:GetSetting(systemIndex, "IconSize") or 100, self:GetSetting(systemIndex, "Opacity") or 100
     frame:SetScale(size / 100)
     OrbitEngine.NativeFrame:Modify(frame, { alpha = alpha / 100 })
-
-    -- Always visible
     frame:Show()
-
     OrbitEngine.Frame:RestorePosition(frame, self, systemIndex)
-
-    -- Trigger layout refresh
     self:ProcessChildren(frame)
 end
 
+
 function Plugin:UpdateVisuals(frame)
-    if frame then
-        self:ApplySettings(frame)
-    end
+    if frame then self:ApplySettings(frame) end
 end
 
 function Plugin:GetFrameBySystemIndex(systemIndex)
@@ -1478,5 +1448,9 @@ function Plugin:OnDisable()
     if self.monitorTicker then
         self.monitorTicker:Cancel()
         self.monitorTicker = nil
+    end
+    if self.trackedTicker then
+        self.trackedTicker:Cancel()
+        self.trackedTicker = nil
     end
 end

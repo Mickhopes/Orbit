@@ -179,10 +179,13 @@ C.Cooldown = {
     DefaultLimit = 10,
     DefaultPadding = 2,
     DefaultIconSize = 100,
+    MaxChildFrames = 14,
     SystemIndex = {
         Essential = 1,
         Utility = 2,
         BuffIcon = 3,
+        Tracked = 4,
+        Tracked_ChildStart = 5,
     },
 }
 

@@ -13,4 +13,5 @@
 ## X-Part-Of: Orbit
 
 CooldownManager.lua
+TrackedAbilities.lua
 KeybindSystem.lua

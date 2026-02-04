@@ -3,10 +3,9 @@ local Orbit = Orbit
 local OrbitEngine = Orbit.Engine
 local Constants = Orbit.Constants
 
--- Local defaults (decoupled from Core Constants)
-local BUTTON_SIZE = 36
-
 -- [ CONSTANTS ]-------------------------------------------------------------------------------------
+local BUTTON_SIZE = 36
+local INITIAL_FRAME_SIZE = 40
 local PET_BAR_INDEX = 9
 local STANCE_BAR_INDEX = 10
 local POSSESS_BAR_INDEX = 11
@@ -117,15 +116,6 @@ local BAR_CONFIG = {
         count = 2,
         isSpecial = true,
     },
-    -- { TODO: This isn't working properly, add later.
-    --     blizzName = "ExtraAbilityContainer",
-    --     orbitName = "OrbitExtraBar",
-    --     label = "Extra Action",
-    --     index = 12,
-    --     buttonPrefix = "ExtraActionButton",
-    --     count = 1,
-    --     isSpecial = true,
-    -- },
 }
 
 local Plugin = Orbit:RegisterPlugin("Action Bars", "Orbit_ActionBars", {
@@ -165,15 +155,12 @@ Plugin.canvasMode = true
 -- Apply NativeBarMixin for mouse-over fade
 Mixin(Plugin, Orbit.NativeBarMixin)
 
--- Container references: index -> container frame
 Plugin.containers = {}
--- Button references: index -> { buttons }
 Plugin.buttons = {}
--- Original Blizzard bars: index -> blizzard bar
 Plugin.blizzBars = {}
+Plugin.gridCache = {}
 
--- [ HELPERS ]---------------------------------------------------------------------------------------
-
+-- [ HELPERS ]------------------------------------------------------------------------------------
 local function EnsureHiddenFrame()
     if not Orbit.ButtonHideFrame then
         Orbit.ButtonHideFrame = CreateFrame("Frame", "OrbitButtonHideFrame", UIParent)
@@ -183,7 +170,7 @@ local function EnsureHiddenFrame()
     return Orbit.ButtonHideFrame
 end
 
--- [ SETTINGS UI ]-----------------------------------------------------------------------------------
+-- [ SETTINGS UI ]--------------------------------------------------------------------------------
 function Plugin:AddSettings(dialog, systemFrame)
     local systemIndex = systemFrame.systemIndex or 1
     local WL = OrbitEngine.WidgetLogic
@@ -195,31 +182,23 @@ function Plugin:AddSettings(dialog, systemFrame)
         controls = {},
     }
 
-    -- Master Control: # Action Bars (only on Bar 1)
-    -- This structural setting controls visibility of bars 2-8
-    -- Stored per-profile in Action Bar 1 settings
     if systemIndex == 1 then
         table.insert(schema.controls, {
             type = "slider",
-            key = "NumActionBars", -- Per-profile setting stored in Action Bar 1 config
-            label = "|cFFFFD100# Action Bars|r", -- Gold text to indicate structural setting
+            key = "NumActionBars",
+            label = "|cFFFFD100# Action Bars|r",
             default = 4,
             min = 2,
             max = 8,
             step = 1,
-            updateOnRelease = true, -- Prevent heavy updates during drag
-            -- PERFORMANCE: Change detection + targeted refresh (only Action Bars)
+            updateOnRelease = true,
             onChange = function(val)
-                -- Change Detection: Skip if value unchanged
                 local current = Plugin:GetSetting(1, "NumActionBars") or 4
                 if current == val then
                     return
                 end
 
-                -- Store the value in per-profile plugin settings
                 Plugin:SetSetting(1, "NumActionBars", val)
-
-                -- Targeted refresh: Only Action Bars plugin
                 Plugin:ApplyAll()
             end,
         })
@@ -248,8 +227,6 @@ function Plugin:AddSettings(dialog, systemFrame)
     local config = BAR_CONFIG[systemIndex]
 
     -- 3. # Icons (Limits total buttons shown)
-    -- Only show for Standard bars with > 1 button potential
-    -- Special bars (Pet, Stance, etc.) have fixed button counts logic
     local isSpecialBar = config.isSpecial or SPECIAL_BAR_INDICES[systemIndex]
 
     if config and config.count > 1 and not isSpecialBar then
@@ -402,7 +379,7 @@ function Plugin:AddSettings(dialog, systemFrame)
     Orbit.Config:Render(dialog, systemFrame, self, schema)
 end
 
--- [ LIFECYCLE ]-------------------------------------------------------------------------------------
+-- [ LIFECYCLE ]----------------------------------------------------------------------------------
 function Plugin:OnLoad()
     -- Create containers immediately
     self:InitializeContainers()
@@ -458,17 +435,13 @@ function Plugin:OnLoad()
         local wasDragging = self.isDraggingDroppable
 
         if isDraggingDroppable then
-            -- Started or continuing a drag - show empty slots
             self.isDraggingDroppable = true
         elseif wasDragging then
-            -- Was dragging but now cursor is empty (dropped) - re-hide empty slots
             self.isDraggingDroppable = false
         else
-            -- Not dragging and wasn't dragging - ignore (filters out hand->sword changes)
             return
         end
 
-        -- Debounce to avoid rapid re-layouts
         if self.cursorTimer then
             self.cursorTimer:Cancel()
         end
@@ -480,8 +453,6 @@ function Plugin:OnLoad()
     end, self)
 end
 
--- Check if a component is disabled via Canvas Mode drag-to-disable feature
--- Multi-system override for Action Bars (systemIndex 1-11)
 function Plugin:IsComponentDisabled(componentKey, systemIndex)
     systemIndex = systemIndex or 1
     local disabled = self:GetSetting(systemIndex, "DisabledComponents") or {}
@@ -493,7 +464,7 @@ function Plugin:IsComponentDisabled(componentKey, systemIndex)
     return false
 end
 
--- [ CANVAS MODE PREVIEW ]-----------------------------------------------------------------------
+-- [ CANVAS MODE PREVIEW ]------------------------------------------------------------------------
 function Plugin:SetupCanvasPreview(container, systemIndex)
     local plugin = self
     local LSM = LibStub("LibSharedMedia-3.0")
@@ -536,7 +507,6 @@ function Plugin:SetupCanvasPreview(container, systemIndex)
         icon:SetTexture(iconTexture)
 
         -- Apply border matching Orbit style
-        -- Only include edgeFile when borderSize > 0 to avoid rendering glitches
         local backdrop = {
             bgFile = "Interface\\BUTTONS\\WHITE8x8",
             insets = { left = 0, right = 0, top = 0, bottom = 0 },
@@ -551,10 +521,7 @@ function Plugin:SetupCanvasPreview(container, systemIndex)
             preview:SetBackdropBorderColor(0, 0, 0, 1)
         end
 
-        -- [ TEXT COMPONENTS ]------------------------------------------------------------
-        -- Add draggable text labels for Keybind
-
-        -- Get saved positions (use global if synced)
+        -- [ TEXT COMPONENTS ]-----------------------------------------------------------
         local useGlobal = plugin:GetSetting(systemIndex, "UseGlobalTextStyle")
         local savedPositions
         if useGlobal ~= false then
@@ -623,7 +590,7 @@ function Plugin:SetupCanvasPreview(container, systemIndex)
                     -- Ensure text is above the border
                     comp:SetFrameLevel(preview:GetFrameLevel() + 10)
                     preview.components[def.key] = comp
-                    fs:Hide() -- Hide original, comp has its own visual
+                    fs:Hide()
                 end
             else
                 -- Fallback: just position the FontString directly
@@ -636,7 +603,7 @@ function Plugin:SetupCanvasPreview(container, systemIndex)
     end
 end
 
--- [ TEXT COMPONENT SETTINGS ]-------------------------------------------------------------------
+-- [ TEXT COMPONENT SETTINGS ]--------------------------------------------------------------------
 -- Apply Canvas Mode text component positions and styling to action buttons
 function Plugin:ApplyTextSettings(button, systemIndex)
     if not button then
@@ -746,8 +713,6 @@ function Plugin:ApplyTextSettings(button, systemIndex)
             anchorPoint = anchorY .. anchorX -- e.g., "TOPRIGHT"
         end
 
-        -- JustifyH-decoupled pattern: text element anchors by its alignment
-        -- This ensures proper text flow while anchoring to corners
         local textPoint
         if justifyH == "LEFT" then
             textPoint = "LEFT"
@@ -906,7 +871,7 @@ function Plugin:OnCombatEnd()
     end)
 end
 
--- [ CONTAINER CREATION ]----------------------------------------------------------------------------
+-- [ CONTAINER CREATION ]-------------------------------------------------------------------------
 function Plugin:InitializeContainers()
     for _, config in ipairs(BAR_CONFIG) do
         if not self.containers[config.index] then
@@ -918,7 +883,7 @@ end
 function Plugin:CreateContainer(config)
     -- Use SecureHandlerStateTemplate for visibility drivers
     local frame = CreateFrame("Frame", config.orbitName, UIParent, "SecureHandlerStateTemplate")
-    frame:SetSize(40, 40) -- Will be resized by layout
+    frame:SetSize(INITIAL_FRAME_SIZE, INITIAL_FRAME_SIZE)
     frame.systemIndex = config.index
     frame.editModeName = config.label
     frame.blizzBarName = config.blizzName
@@ -936,8 +901,6 @@ function Plugin:CreateContainer(config)
     }
 
     -- Visibility Driver
-    -- Always hide in Pet Battle or Vehicle UI (Standard & Special bars)
-    -- Pet Bar (index 9) has additional logic: only show when player has an active pet
     if config.index == PET_BAR_INDEX then
         RegisterStateDriver(frame, "visibility", "[petbattle][vehicleui] hide; [nopet] hide; show")
     else
@@ -961,7 +924,6 @@ function Plugin:CreateContainer(config)
     self.blizzBars[config.index] = _G[config.blizzName]
 
     -- [ SPELL FLYOUT SUPPORT ]
-    -- Buttons call getParent():GetSpellFlyoutDirection() to determine flyout orientation
     frame.GetSpellFlyoutDirection = function(f)
         local direction = "UP" -- Default
         local screenHeight = GetScreenHeight()
@@ -972,14 +934,7 @@ function Plugin:CreateContainer(config)
             -- Determine quadrant
             local isTop = y > (screenHeight / 2)
             local isLeft = x < (screenWidth / 2)
-
-            -- Simple logic: if in top half, fly down. If in bottom half, fly up.
-            -- We can refine this for side bars if needed (e.g. if near side edge, fly inward)
-            -- For now, vertical bias is standard for horizontal bars
             direction = isTop and "DOWN" or "UP"
-
-            -- If we are a vertical bar (Action Bar 4/5 usually), we might want LEFT/RIGHT
-            -- Checking orientation from plugin settings would be better, but we can verify via dimensions
             if f:GetHeight() > f:GetWidth() then
                 -- Vertical bar
                 direction = isLeft and "RIGHT" or "LEFT"
@@ -991,13 +946,11 @@ function Plugin:CreateContainer(config)
     -- [ ACTION BAR 1 PAGING ]
     -- Only the main bar (Index 1) needs paging logic
     if config.index == 1 then
-        -- Define the secure paging driver
-        -- Priority: Vehicle > Override > Possess > Shapeshift > Bonus > Bar Paging > Default
         local pagingDriver = table.concat({
-            "[vehicleui] 12", -- Vehicle Page
-            "[overridebar] 14", -- Override Page
-            "[possessbar] 12", -- Possess Page
-            "[shapeshift] 13", -- Shapeshift Page
+            "[vehicleui] 12",
+            "[overridebar] 14",
+            "[possessbar] 12",
+            "[shapeshift] 13",
 
             -- Bar Paging (Manual Shift+1..6)
             "[bar:2] 2",
@@ -1024,10 +977,6 @@ function Plugin:CreateContainer(config)
         ]]
         )
         RegisterStateDriver(frame, "page", pagingDriver)
-
-        -- Update Visibility Driver for Bar 1 handling Vehicle UI
-        -- We WANT Bar 1 to show in Vehicle UI (it pages to 12), unlike other bars
-        -- BUT if we are in an Override Bar state (e.g. Dragonriding/Complex Vehicles), we yield to Native UI
         UnregisterStateDriver(frame, "visibility")
         RegisterStateDriver(frame, "visibility", "[petbattle][overridebar] hide; show")
     end
@@ -1043,7 +992,7 @@ function Plugin:CreateContainer(config)
     return frame
 end
 
--- [ BUTTON REPARENTING ]----------------------------------------------------------------------------
+-- [ BUTTON REPARENTING ]-------------------------------------------------------------------------
 function Plugin:ReparentAllButtons()
     if InCombatLockdown() then
         return
@@ -1101,15 +1050,8 @@ function Plugin:ReparentButtons(index)
         end
     end
 
-    -- Always protect the native bar if it exists, regardless of button state
-    -- This ensures that even if buttons aren't found immediately, the native bar frame is hidden/disabled
     if blizzBar then
-        -- Use SEcureHide for ALL Blizzard action bars to prevent Taint.
-        -- Previous use of Protect() (ClearAllPoints) or SetParent() caused "ADDON_ACTION_BLOCKED".
         OrbitEngine.NativeFrame:SecureHide(blizzBar)
-
-        -- Hide decorations (These are usually insecure textures, so harmless to hide,
-        -- but wrap in safe check just in case)
         if blizzBar.BorderArt and blizzBar.BorderArt.Hide then
             blizzBar.BorderArt:Hide()
         end
@@ -1140,7 +1082,7 @@ function Plugin:ReparentButtons(index)
     end
 end
 
--- [ BUTTON LAYOUT AND SKINNING ]--------------------------------------------------------------------
+-- [ BUTTON LAYOUT AND SKINNING ]-----------------------------------------------------------------
 function Plugin:LayoutButtons(index)
     if InCombatLockdown() then
         return
@@ -1166,7 +1108,6 @@ function Plugin:LayoutButtons(index)
     end
 
     -- CURSOR OVERRIDE: Show grid when dragging droppable content (spell, petaction, flyout, etc.)
-    -- EXCEPT for special bars (Stance, Possess, Extra) which don't accept drops
     local cursorType = GetCursorInfo()
     local cursorOverridesHide = cursorType == "spell"
         or cursorType == "petaction"
@@ -1184,7 +1125,6 @@ function Plugin:LayoutButtons(index)
     local numIcons = self:GetSetting(index, "NumIcons") or (config and config.count or 12)
 
     -- Calculate button size
-    -- Note: Container is scaled via ApplyScale, so we use base size here
     local w = BUTTON_SIZE
     local h = w
 
@@ -1203,19 +1143,32 @@ function Plugin:LayoutButtons(index)
 
     -- Apply layout to each button
     local totalEffective = math.min(#buttons, numIcons)
-
-    -- Determine grid wrapping limit
-    -- Horizontal: Wrap after N columns (based on rows count)
-    -- Vertical: Wrap after N rows
     local limitPerLine
     if orientation == 0 then
         limitPerLine = math.ceil(totalEffective / rows)
-        if limitPerLine < 1 then
-            limitPerLine = 1
-        end
+        if limitPerLine < 1 then limitPerLine = 1 end
     else
         limitPerLine = rows
     end
+
+    -- Lazy grid computation: cache positions by layout parameters
+    local cacheKey = string.format("%d_%d_%d_%d_%d", numIcons, limitPerLine, orientation, w, padding)
+    local cache = self.gridCache[index]
+    if not cache or cache.key ~= cacheKey then
+        local positions = {}
+        local scale = buttons[1] and buttons[1]:GetEffectiveScale() or 1
+        for i = 1, numIcons do
+            local x, y = OrbitEngine.Layout:ComputeGridPosition(i, limitPerLine, orientation, w, h, padding)
+            if OrbitEngine.Pixel then
+                x = OrbitEngine.Pixel:Snap(x, scale)
+                y = OrbitEngine.Pixel:Snap(y, scale)
+            end
+            positions[i] = { x = x, y = y }
+        end
+        self.gridCache[index] = { key = cacheKey, positions = positions }
+        cache = self.gridCache[index]
+    end
+    local cachedPositions = cache.positions
 
     for i, button in ipairs(buttons) do
         -- Strict Icon Limit
@@ -1228,8 +1181,6 @@ function Plugin:LayoutButtons(index)
             end
             button.orbitHidden = true
         else
-            -- Handle HideEmptyButtons - check if button has an action
-            -- Priority: button:HasAction() method > C_ActionBar.HasAction
             local hasAction = false
 
             -- Method 1: Button's own HasAction method (most reliable for all button types)
@@ -1273,29 +1224,20 @@ function Plugin:LayoutButtons(index)
                 -- Apply Canvas Mode text component positions (Keybind, MacroText, Timer, Stacks)
                 self:ApplyTextSettings(button, index)
 
-                -- Position button based on array index (buttons keep their positions)
+                -- Position button from cached grid positions
                 button:ClearAllPoints()
-
-                local x, y = OrbitEngine.Layout:ComputeGridPosition(i, limitPerLine, orientation, w, h, padding)
-                -- Force pixel snap for button position within container
-                if OrbitEngine.Pixel then
-                    x = OrbitEngine.Pixel:Snap(x, button:GetEffectiveScale())
-                    y = OrbitEngine.Pixel:Snap(y, button:GetEffectiveScale())
-                end
-                button:SetPoint("TOPLEFT", container, "TOPLEFT", x, y)
+                local pos = cachedPositions[i]
+                button:SetPoint("TOPLEFT", container, "TOPLEFT", pos.x, pos.y)
             end
         end
     end
-
-    -- Calculate container size based on NumIcons (strict grid)
-    -- This keeps the container the same size regardless of empty button visibility
 
     local finalW, finalH = OrbitEngine.Layout:ComputeGridContainerSize(
         totalEffective,
         limitPerLine,
         orientation,
-        w, -- button width
-        h, -- button height
+        w,
+        h,
         padding
     )
 
@@ -1306,7 +1248,7 @@ function Plugin:LayoutButtons(index)
     container.orbitColumnWidth = w
 end
 
--- [ SETTINGS APPLICATION ]--------------------------------------------------------------------------
+-- [ SETTINGS APPLICATION ]-----------------------------------------------------------------------
 function Plugin:ApplyAll()
     for index, container in pairs(self.containers) do
         -- Skip disabled containers logic inside ApplySettings
@@ -1351,8 +1293,6 @@ function Plugin:ApplySettings(frame)
         end
     end
 
-    -- Ensure Blizzard bar is hidden regardless of Orbit enabled state
-    -- Lazy load check
     if not self.blizzBars[index] then
         local config = BAR_CONFIG[index]
         if config then
@@ -1394,10 +1334,7 @@ function Plugin:ApplySettings(frame)
     OrbitEngine.FrameAnchor:SetFrameDisabled(actualFrame, false)
 
     -- Re-register visibility driver if it was disabled
-    -- Respect standard behavior for all bars, BUT preserve special drivers for index 1
     if index == 1 then
-        -- Do nothing, as Bar 1 manages its own complex driver (created in InitializeContainers)
-        -- Re-registering here would overwrite the [overridebar] logic with the default driver
     else
         RegisterStateDriver(actualFrame, "visibility", VISIBILITY_DRIVER)
     end
@@ -1426,8 +1363,6 @@ function Plugin:ApplySettings(frame)
     OrbitEngine.Frame:RestorePosition(actualFrame, self, index)
 
     -- Force update flyout direction after position restore
-    -- This ensures that if the bar moved past the vertical threshold, arrows flip immediately
-    -- explicitely set direction on buttons because they might not find the parent correctly
     if self.buttons[index] then
         local direction = "UP"
         if actualFrame.GetSpellFlyoutDirection then
