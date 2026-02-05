@@ -854,6 +854,8 @@ function Plugin:UpdatePower()
                 Frame.StatusBar:SetValue(stagger, SMOOTH_ANIM)
 
                 -- Dynamic color based on stagger level (determined via aura check, not arithmetic)
+                local staggerKey = "Stagger" .. (level:sub(1,1):upper() .. level:sub(2):lower())
+                local color = colors[staggerKey] or colors.StaggerLow
                 Frame.StatusBar:SetStatusBarColor(color.r, color.g, color.b)
             end
 
