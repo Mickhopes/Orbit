@@ -12,6 +12,7 @@ local Plugin = Orbit:RegisterPlugin("Pet Frame", SYSTEM_ID, {
     defaults = {
         Width = 100,
         Height = 20,
+        Opacity = 100,
         OutOfCombatFade = false,
         ShowOnMouseover = true,
     },
@@ -34,6 +35,10 @@ function Plugin:AddSettings(dialog, systemFrame)
             { type = "slider", key = "Height", label = "Height", min = 10, max = 60, step = 5, default = 20 },
         },
     }
+
+    -- Opacity (resting alpha when visible)
+    local WL = OrbitEngine.WidgetLogic
+    WL:AddOpacitySettings(self, schema, systemIndex, systemFrame, { step = 5 })
 
     table.insert(schema.controls, {
         type = "checkbox",
