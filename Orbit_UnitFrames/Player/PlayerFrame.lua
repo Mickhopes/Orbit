@@ -87,7 +87,6 @@ function Plugin:AddSettings(dialog, systemFrame)
         table.insert(schema.controls, {
             type = "dropdown", key = "HealthTextMode", label = "Health Text",
             options = {
-                { text = "Hide", value = "hide" },
                 { text = "Percentage", value = "percent" },
                 { text = "Short Health", value = "short" },
                 { text = "Raw Health", value = "raw" },

@@ -12,7 +12,6 @@ local UnitButton = Engine.UnitButton
 -- [ HEALTH TEXT MODES ]-----------------------------------------------------------------------------
 -- Export modes for use by plugins
 local HEALTH_TEXT_MODES = {
-    HIDE = "hide",
     PERCENT = "percent",
     SHORT = "short",
     RAW = "raw",
@@ -127,11 +126,6 @@ function TextMixin:UpdateHealthText()
 
     local mode = self.healthTextMode or HEALTH_TEXT_MODES.PERCENT_SHORT
 
-    -- Handle Hide mode
-    if mode == HEALTH_TEXT_MODES.HIDE then
-        self.HealthText:Hide()
-        return
-    end
 
     if self.healthTextEnabled == false then
         self.HealthText:Hide()
