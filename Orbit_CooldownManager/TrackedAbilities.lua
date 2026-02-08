@@ -144,8 +144,7 @@ function Plugin:CreateTrackedAnchor(name, systemIndex, label)
     frame.DropHighlight:Hide()
 
     if not frame:GetPoint() then
-        local yOffset = (systemIndex == TRACKED_INDEX) and -250 or -150
-        frame:SetPoint("CENTER", UIParent, "CENTER", 0, yOffset)
+        frame:SetPoint("CENTER", UIParent, "CENTER", -30, 0)
     end
 
     frame:SetScript("OnReceiveDrag", function() plugin:OnTrackedAnchorReceiveDrag(frame) end)
@@ -315,8 +314,9 @@ function Plugin:DespawnChildFrame(frame)
     for _, icon in pairs(frame.activeIcons or {}) do icon:Hide() end
     for _, btn in pairs(frame.edgeButtons or {}) do btn:Hide() end
 
-    self:SetSetting(frame.systemIndex, "TrackedItems", nil)
+    self:SetSetting(frame.systemIndex, self:GetSpecKey("TrackedItems"), nil)
     self:SetSetting(frame.systemIndex, "Position", nil)
+    self:SetSetting(frame.systemIndex, "Anchor", nil)
     self:SetSetting(frame.systemIndex, "Enabled", nil)
 
     GetViewerMap()[frame.systemIndex] = nil
@@ -329,7 +329,7 @@ function Plugin:RestoreChildFrames()
     for slot = 1, MAX_CHILD_FRAMES do
         local systemIndex = TRACKED_CHILD_START + slot - 1
         local enabled = self:GetSetting(systemIndex, "Enabled")
-        local tracked = self:GetSetting(systemIndex, "TrackedItems")
+        local tracked = self:GetSetting(systemIndex, self:GetSpecKey("TrackedItems"))
         if enabled or (tracked and next(tracked)) then
             local key = "child:" .. slot
             local label = "Tracked Cooldowns " .. (slot + 1)
@@ -342,6 +342,24 @@ function Plugin:RestoreChildFrames()
             self:LoadTrackedItems(frame, systemIndex)
             self:SetupTrackedCanvasPreview(frame, systemIndex)
             self:ApplySettings(frame)
+            self:ClearStaleTrackedSpatial(frame, systemIndex)
+        end
+    end
+end
+
+-- Clear stale anchor/position data from a tracked frame with no items for the current spec.
+-- Handles both directions: outbound (this frame anchored to X) and inbound (X anchored to this frame).
+function Plugin:ClearStaleTrackedSpatial(frame, sysIndex)
+    if not frame or (frame.gridItems and next(frame.gridItems)) then return end
+    self:SetSetting(sysIndex, "Anchor", nil)
+    self:SetSetting(sysIndex, "Position", nil)
+    if OrbitEngine.FrameAnchor then
+        OrbitEngine.FrameAnchor:BreakAnchor(frame, true)
+        for _, child in ipairs(OrbitEngine.FrameAnchor:GetAnchoredChildren(frame)) do
+            OrbitEngine.FrameAnchor:BreakAnchor(child, true)
+            if child.orbitPlugin and child.systemIndex then
+                child.orbitPlugin:SetSetting(child.systemIndex, "Anchor", nil)
+            end
         end
     end
 end
@@ -538,7 +556,7 @@ local function ParseGridKey(key)
 end
 
 function Plugin:SaveTrackedItem(systemIndex, x, y, itemType, itemId)
-    local tracked = self:GetSetting(systemIndex, "TrackedItems") or {}
+    local tracked = self:GetSetting(systemIndex, self:GetSpecKey("TrackedItems")) or {}
     local key = GridKey(x, y)
     if itemType and itemId then
         local actDur = ParseActiveDuration(itemType, itemId)
@@ -547,11 +565,11 @@ function Plugin:SaveTrackedItem(systemIndex, x, y, itemType, itemId)
     else
         tracked[key] = nil
     end
-    self:SetSetting(systemIndex, "TrackedItems", tracked)
+    self:SetSetting(systemIndex, self:GetSpecKey("TrackedItems"), tracked)
 end
 
 function Plugin:LoadTrackedItems(anchor, systemIndex)
-    local tracked = self:GetSetting(systemIndex, "TrackedItems") or {}
+    local tracked = self:GetSetting(systemIndex, self:GetSpecKey("TrackedItems")) or {}
 
     -- Migration: convert old slot-based data to coordinate-based
     local needsMigration = false
@@ -568,7 +586,7 @@ function Plugin:LoadTrackedItems(anchor, systemIndex)
             end
         end
         tracked = migrated
-        self:SetSetting(systemIndex, "TrackedItems", tracked)
+        self:SetSetting(systemIndex, self:GetSpecKey("TrackedItems"), tracked)
     end
 
     -- Deep copy to avoid shared reference between frames
@@ -583,10 +601,7 @@ end
 -- [ ICON UPDATES ]-----------------------------------------------------------------------------------
 local function IsSpellUsable(spellId)
     if not spellId then return false end
-    if IsSpellKnown(spellId) then return true end
-    if IsPlayerSpell(spellId) then return true end
-    local cooldown = C_Spell.GetSpellCooldown(spellId)
-    return cooldown and cooldown.startTime and cooldown.startTime > 0
+    return IsSpellKnown(spellId) or IsPlayerSpell(spellId)
 end
 
 local function IsItemUsable(itemId)
@@ -655,10 +670,30 @@ function Plugin:UpdateTrackedIcon(icon)
             icon.Icon:SetTexture(texture)
             local cdInfo = C_Spell.GetSpellCooldown(icon.trackedId) or {}
             local onGCD = cdInfo.isOnGCD
+            local chargeInfo = icon.isChargeSpell and C_Spell.GetSpellCharges and C_Spell.GetSpellCharges(icon.trackedId)
+
             if onGCD and not showGCDSwipe then
                 icon.Cooldown:Clear()
                 icon.ActiveCooldown:Clear()
                 icon.Icon:SetDesaturation(0)
+            elseif chargeInfo then
+                local chargeDurObj = C_Spell.GetSpellChargesDuration and C_Spell.GetSpellChargesDuration(icon.trackedId)
+                if chargeDurObj then
+                    icon.Cooldown:SetCooldownFromDurationObject(chargeDurObj, true)
+                    local allConsumed = not issecretvalue(chargeInfo.currentCharges) and chargeInfo.currentCharges == 0
+                    icon.Icon:SetDesaturation(allConsumed and chargeDurObj:EvaluateRemainingPercent(icon.desatCurve or DESAT_CURVE) or 0)
+                    if icon.cdAlphaCurve and allConsumed then
+                        icon.Cooldown:SetAlpha(chargeDurObj:EvaluateRemainingPercent(icon.cdAlphaCurve))
+                    else
+                        icon.Cooldown:SetAlpha(1)
+                    end
+                else
+                    icon.Cooldown:Clear()
+                    icon.Cooldown:SetAlpha(1)
+                    icon.Icon:SetDesaturation(0)
+                end
+                icon.ActiveCooldown:Clear()
+                if icon._activeGlowing then Plugin:StopActiveGlow(icon) end
             else
                 durObj = C_Spell.GetSpellCooldownDuration(icon.trackedId)
                 if durObj then
@@ -691,7 +726,7 @@ function Plugin:UpdateTrackedIcon(icon)
                     if icon._activeGlowing then Plugin:StopActiveGlow(icon) end
                 end
             end
-            local displayCount = C_Spell.GetSpellDisplayCount(icon.trackedId)
+            local displayCount = chargeInfo and chargeInfo.currentCharges or C_Spell.GetSpellDisplayCount(icon.trackedId)
             if displayCount then
                 icon.CountText:SetText(displayCount)
                 icon.CountText:Show()
@@ -910,6 +945,10 @@ function Plugin:LayoutTrackedIcons(anchor, systemIndex)
         local hasActive = data.activeDuration and data.cooldownDuration
         icon.desatCurve = hasActive and BuildDesatCurve(data.activeDuration, data.cooldownDuration) or nil
         icon.cdAlphaCurve = hasActive and BuildCooldownAlphaCurve(data.activeDuration, data.cooldownDuration) or nil
+        if data.type == "spell" and C_Spell.GetSpellCharges then
+            local ci = C_Spell.GetSpellCharges(data.id)
+            icon.isChargeSpell = ci and ci.maxCharges and ci.maxCharges > 1 or false
+        end
 
         self:UpdateTrackedIcon(icon)
         self:ApplyTrackedIconSkin(icon, systemIndex)
@@ -1109,7 +1148,7 @@ function Plugin:ReparseActiveDurations()
     local viewerMap = GetViewerMap()
     local function ReparseAnchor(anchor, systemIndex)
         if not anchor then return end
-        local tracked = self:GetSetting(systemIndex, "TrackedItems") or {}
+        local tracked = self:GetSetting(systemIndex, self:GetSpecKey("TrackedItems")) or {}
         local changed = false
         for key, data in pairs(tracked) do
             if data.id then
@@ -1122,8 +1161,14 @@ function Plugin:ReparseActiveDurations()
                 end
             end
         end
-        if changed then self:SetSetting(systemIndex, "TrackedItems", tracked) end
+        if changed then self:SetSetting(systemIndex, self:GetSpecKey("TrackedItems"), tracked) end
         for _, icon in pairs(anchor.activeIcons or {}) do
+            local key = icon.gridX .. "," .. icon.gridY
+            local data = tracked[key]
+            if data then
+                icon.activeDuration = data.activeDuration
+                icon.cooldownDuration = data.cooldownDuration
+            end
             local hasActive = icon.activeDuration and icon.cooldownDuration
             icon.desatCurve = hasActive and BuildDesatCurve(icon.activeDuration, icon.cooldownDuration) or nil
             icon.cdAlphaCurve = hasActive and BuildCooldownAlphaCurve(icon.activeDuration, icon.cooldownDuration) or nil
@@ -1142,7 +1187,32 @@ function Plugin:RegisterTalentWatcher()
     local plugin = self
     local frame = CreateFrame("Frame")
     frame:RegisterEvent("TRAIT_CONFIG_UPDATED")
-    frame:SetScript("OnEvent", function() plugin:ReparseActiveDurations() end)
+    frame:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
+    frame:SetScript("OnEvent", function(_, event)
+        if event == "PLAYER_SPECIALIZATION_CHANGED" then
+            plugin:ReloadTrackedForSpec()
+        end
+        plugin:ReparseActiveDurations()
+    end)
+end
+
+function Plugin:ReloadTrackedForSpec()
+    -- Reload tracked abilities for main anchor
+    local viewerMap = GetViewerMap()
+    local entry = viewerMap[TRACKED_INDEX]
+    if entry and entry.anchor then
+        self:LoadTrackedItems(entry.anchor, TRACKED_INDEX)
+        self:ClearStaleTrackedSpatial(entry.anchor, TRACKED_INDEX)
+    end
+    -- Reload child anchors
+    for _, childData in pairs(self.activeChildren) do
+        if childData.frame then
+            self:LoadTrackedItems(childData.frame, childData.frame.systemIndex)
+            self:ClearStaleTrackedSpatial(childData.frame, childData.frame.systemIndex)
+        end
+    end
+    -- Reload charge bars
+    self:ReloadChargeBarsForSpec()
 end
 
 -- [ SPELL CAST WATCHER ]-----------------------------------------------------------------------------
@@ -1226,7 +1296,7 @@ function Plugin:SetupTrackedCanvasPreview(anchor, systemIndex)
         preview.components = {}
 
         local iconTexture = TRACKED_PLACEHOLDER_ICON
-        local tracked = plugin:GetSetting(systemIndex, "TrackedItems") or {}
+        local tracked = plugin:GetSetting(systemIndex, plugin:GetSpecKey("TrackedItems")) or {}
         for _, data in pairs(tracked) do
             if data and data.type and data.id then
                 if data.type == "spell" then
