@@ -88,6 +88,8 @@ function Plugin:OnLoad()
     self:StartTrackedUpdateTicker()
     self:RegisterCursorWatcher()
     self:SetupEditModeHooks()
+    self:RegisterTalentWatcher()
+    self:RegisterSpellCastWatcher()
 
     Orbit.EventBus:On("PLAYER_ENTERING_WORLD", self.OnPlayerEnteringWorld, self)
     self:RegisterVisibilityEvents()
@@ -111,6 +113,7 @@ end
 -- [ ANCHOR CREATION ]-------------------------------------------------------------------------------
 function Plugin:CreateAnchor(name, systemIndex, label)
     local frame = CreateFrame("Frame", name, UIParent)
+    OrbitEngine.Pixel:Enforce(frame)
     frame:SetSize(40, 40)
     frame:SetClampedToScreen(true)
     frame.systemIndex = systemIndex
