@@ -85,7 +85,8 @@ local CONTINUOUS_RESOURCE_CONFIG = {
                 text:SetText("0")
                 return
             end
-            local count = auraInstanceID and C_UnitAuras.GetAuraApplicationDisplayCount
+            local count = auraInstanceID
+                and C_UnitAuras.GetAuraApplicationDisplayCount
                 and tonumber(C_UnitAuras.GetAuraApplicationDisplayCount("player", auraInstanceID))
             text:SetText((count and count > 0) and count or 1)
         end,
@@ -309,75 +310,134 @@ function Plugin:OnLoad()
 
     -- [ CANVAS PREVIEW ] -------------------------------------------------------------------------------
     function Frame:CreateCanvasPreview(options)
-        local scale = options.scale or 1
-        local borderSize = options.borderSize or 1
-
-        -- Base container
-        local preview = OrbitEngine.Preview.Frame:CreateBasePreview(self, scale, options.parent, borderSize)
-
-        -- Generate representative buttons (e.g. 5 combo points)
-        local buttonCount = 5
-        local textureName = Plugin:GetSetting(SYSTEM_INDEX, "Texture")
-        local spacing = borderSize * scale
-        local totalSpacing = (buttonCount - 1) * spacing
-
-        -- Calculate dimensions inside the border
-        local totalWidth = preview:GetWidth()
-        local height = preview:GetHeight()
-        local btnWidth = (totalWidth - totalSpacing) / buttonCount
-
-        -- Texture path
-        local texturePath = "Interface\\Buttons\\WHITE8x8"
-        if textureName and LSM then
-            texturePath = LSM:Fetch("statusbar", textureName) or texturePath
+        local parent = options.parent or UIParent
+        local borderSize = Plugin:GetSetting(SYSTEM_INDEX, "BorderSize")
+        if not borderSize and Orbit.db.GlobalSettings then
+            borderSize = Orbit.db.GlobalSettings.BorderSize
         end
+        borderSize = borderSize or 1
+        local texture = Plugin:GetSetting(SYSTEM_INDEX, "Texture")
+        local spacing = borderSize
+        local scale = self:GetEffectiveScale() or 1
+        local width = self:GetWidth()
+        local height = self:GetHeight()
 
-        -- Get Class Color
-        local _, class = UnitClass("player")
-        local color = Orbit.Colors.PlayerResources[class] or { r = 1, g = 0.8, b = 0 }
+        local preview = CreateFrame("Frame", nil, parent)
+        preview:SetSize(width, height)
+        preview.sourceFrame = self
+        preview.sourceWidth = width
+        preview.sourceHeight = height
+        preview.previewScale = 1
+        preview.components = {}
 
-        -- Create dummy buttons
-        for i = 1, buttonCount do
-            local btn = CreateFrame("Frame", nil, preview, "BackdropTemplate")
-            btn:SetSize(btnWidth, height)
+        local globalBgColor = Orbit.db.GlobalSettings
+            and Orbit.db.GlobalSettings.BackdropColourCurve
+            and OrbitEngine.WidgetLogic
+            and OrbitEngine.WidgetLogic:GetFirstColorFromCurve(Orbit.db.GlobalSettings.BackdropColourCurve)
+        local bgColor = globalBgColor or { r = 0.08, g = 0.08, b = 0.08, a = 0.5 }
 
-            -- Position
-            if i == 1 then
-                btn:SetPoint("LEFT", preview, "LEFT", 0, 0)
-            else
-                btn:SetPoint("LEFT", preview.buttons[i - 1], "RIGHT", spacing, 0)
-            end
-
-            -- Skin it
-            local bar = btn:CreateTexture(nil, "ARTWORK")
+        local isContinuous = Plugin.continuousResource ~= nil
+        if isContinuous then
+            local container = CreateFrame("Frame", nil, preview)
+            container:SetAllPoints()
+            local bar = CreateFrame("StatusBar", nil, container)
             bar:SetAllPoints()
-            bar:SetTexture(texturePath)
-            bar:SetVertexColor(color.r, color.g, color.b)
+            bar:SetMinMaxValues(0, 1)
+            bar:SetValue(0.65)
+            Orbit.Skin.ClassBar:SkinStatusBar(container, bar, { borderSize = borderSize, texture = texture, backColor = bgColor })
 
-            -- Border
-            if Orbit.Skin and Orbit.Skin.ClassBar then
-                local scaledBorder = borderSize * scale
-                if scaledBorder > 0 then
-                    btn:SetBackdrop({
-                        edgeFile = "Interface\\Buttons\\WHITE8x8",
-                        edgeSize = scaledBorder,
-                    })
-                    btn:SetBackdropBorderColor(0, 0, 0, 1)
-                else
-                    btn:SetBackdrop(nil)
+            local cfg = CONTINUOUS_RESOURCE_CONFIG[Plugin.continuousResource]
+            if cfg then
+                local curveKey = cfg.curveKey
+                local curveData = Plugin:GetSetting(SYSTEM_INDEX, curveKey)
+                if curveData then
+                    local color = OrbitEngine.WidgetLogic:SampleColorCurve(curveData, 0.65)
+                    if color then
+                        bar:SetStatusBarColor(color.r, color.g, color.b)
+                    end
                 end
 
-                -- Inset the bar to show border
-                local inset = borderSize * scale
-                bar:ClearAllPoints()
-                bar:SetPoint("TOPLEFT", inset, -inset)
-                bar:SetPoint("BOTTOMRIGHT", -inset, inset)
+                if cfg.dividers then
+                    local divMax = 10
+                    local snappedSpacing = SnapToPixel(spacing, scale)
+                    for i = 1, divMax - 1 do
+                        local sp = bar:CreateTexture(nil, "OVERLAY", nil, 7)
+                        sp:SetColorTexture(0, 0, 0, 1)
+                        sp:SetWidth(snappedSpacing)
+                        sp:SetHeight(height)
+                        local centerPos = SnapToPixel(width * (i / divMax), scale)
+                        sp:SetPoint("LEFT", container, "LEFT", SnapToPixel(centerPos - (snappedSpacing / 2), scale), 0)
+                    end
+                end
             end
+        else
+            local max = self.maxPower or 5
+            local snappedWidth = SnapToPixel(width, scale)
+            local snappedHeight = SnapToPixel(height, scale)
+            local snappedSpacing = SnapToPixel(spacing, scale)
+            local usableWidth = snappedWidth - ((max - 1) * snappedSpacing)
+            local previewActive = math.max(1, max - 1)
 
-            if not preview.buttons then
-                preview.buttons = {}
+            preview.buttons = {}
+            for i = 1, max do
+                local btnUsableWidth = usableWidth / max
+                local leftPos = SnapToPixel((i - 1) * (btnUsableWidth + snappedSpacing), scale)
+                local rightPos = (i == max) and snappedWidth or SnapToPixel(i * (btnUsableWidth + snappedSpacing) - snappedSpacing, scale)
+                local btnWidth = rightPos - leftPos
+
+                local btn = CreateFrame("Frame", nil, preview)
+                btn:SetSize(btnWidth, snappedHeight)
+                btn:SetPoint("LEFT", preview, "LEFT", leftPos, 0)
+                Orbit.Skin.ClassBar:SkinButton(btn, { borderSize = borderSize, texture = texture, backColor = bgColor })
+
+                local color = Plugin:GetResourceColor(i, max)
+                if color and btn.orbitBar then
+                    btn.orbitBar:SetVertexColor(color.r, color.g, color.b)
+                    btn.orbitBar:SetTexCoord((i - 1) / max, i / max, 0, 1)
+                    btn.orbitBar:SetShown(i <= previewActive)
+                end
+
+                preview.buttons[i] = btn
             end
-            preview.buttons[i] = btn
+        end
+
+        local savedPositions = Plugin:GetSetting(SYSTEM_INDEX, "ComponentPositions") or {}
+        local fontName = Plugin:GetSetting(SYSTEM_INDEX, "Font")
+        local fontPath = LSM and LSM:Fetch("font", fontName) or STANDARD_TEXT_FONT
+        local fontSize = Orbit.Skin:GetAdaptiveTextSize(height, 18, 26, 1)
+        local fs = preview:CreateFontString(nil, "OVERLAY", nil, 7)
+        fs:SetFont(fontPath, fontSize, Orbit.Skin:GetFontOutline())
+        if isContinuous then
+            fs:SetText("65")
+        else
+            fs:SetText(tostring(self.maxPower and (self.maxPower - 1) or 4))
+        end
+        fs:SetTextColor(1, 1, 1, 1)
+        fs:SetPoint("CENTER", preview, "CENTER", 0, 0)
+
+        local saved = savedPositions["Text"] or {}
+        local data = {
+            anchorX = saved.anchorX or "CENTER",
+            anchorY = saved.anchorY or "CENTER",
+            offsetX = saved.offsetX or 0,
+            offsetY = saved.offsetY or 0,
+            justifyH = saved.justifyH or "CENTER",
+            overrides = saved.overrides,
+        }
+        local startX = saved.posX or 0
+        local startY = saved.posY or 0
+
+        local CreateDraggableComponent = OrbitEngine.CanvasMode and OrbitEngine.CanvasMode.CreateDraggableComponent
+        if CreateDraggableComponent then
+            local comp = CreateDraggableComponent(preview, "Text", fs, startX, startY, data)
+            if comp then
+                comp:SetFrameLevel(preview:GetFrameLevel() + 10)
+                preview.components["Text"] = comp
+                fs:Hide()
+            end
+        else
+            fs:ClearAllPoints()
+            fs:SetPoint("CENTER", preview, "CENTER", startX, startY)
         end
 
         return preview
@@ -549,16 +609,36 @@ function Plugin:ApplySettings()
     -- Font & Text
     local fontPath = LSM:Fetch("font", fontName)
 
+    -- Get Canvas Mode overrides
+    local positions = self:GetSetting(SYSTEM_INDEX, "ComponentPositions") or {}
+    local textPos = positions.Text or {}
+    local overrides = textPos.overrides or {}
+
+    -- Apply font override
+    if overrides.Font and LSM then
+        fontPath = LSM:Fetch("font", overrides.Font) or fontPath
+    end
+
     if OrbitEngine.ComponentDrag:IsDisabled(Frame.Text) then
         Frame.Text:Hide()
     else
         Frame.Text:Show()
 
-        local positions = self:GetSetting(SYSTEM_INDEX, "ComponentPositions")
-        local textSize = (positions and positions.Text and positions.Text.overrides and positions.Text.overrides.FontSize)
-            or Orbit.Skin:GetAdaptiveTextSize(height, 18, 26, 1)
+        -- Apply size override
+        local textSize = overrides.FontSize or Orbit.Skin:GetAdaptiveTextSize(height, 18, 26, 1)
 
         Frame.Text:SetFont(fontPath, textSize, Orbit.Skin:GetFontOutline())
+
+        -- Apply color override
+        if overrides.CustomColorCurve then
+            local color = OrbitEngine.WidgetLogic:GetFirstColorFromCurve(overrides.CustomColorCurve)
+            if color then
+                Frame.Text:SetTextColor(color.r or 1, color.g or 1, color.b or 1, color.a or 1)
+            end
+        elseif overrides.CustomColorValue and type(overrides.CustomColorValue) == "table" then
+            local c = overrides.CustomColorValue
+            Frame.Text:SetTextColor(c.r or 1, c.g or 1, c.b or 1, c.a or 1)
+        end
 
         Frame.Text:ClearAllPoints()
         if height > textSize then
@@ -922,18 +1002,26 @@ end
 
 -- [ SPACER REPOSITIONING ]-------------------------------------------------------------------------
 function Plugin:RepositionSpacers(max)
-    if not Frame or not Frame.Spacers then return end
+    if not Frame or not Frame.Spacers then
+        return
+    end
     if not max or max <= 1 then
-        for _, s in ipairs(Frame.Spacers) do s:Hide() end
+        for _, s in ipairs(Frame.Spacers) do
+            s:Hide()
+        end
         return
     end
 
     local spacerWidth = (Frame.settings and Frame.settings.spacing) or 2
     local totalWidth = Frame:GetWidth()
-    if totalWidth < 10 and Frame.settings then totalWidth = Frame.settings.width or 200 end
+    if totalWidth < 10 and Frame.settings then
+        totalWidth = Frame.settings.width or 200
+    end
 
     local scale = Frame:GetEffectiveScale()
-    if not scale or scale < 0.01 then scale = 1 end
+    if not scale or scale < 0.01 then
+        scale = 1
+    end
 
     local snappedSpacerWidth = SnapToPixel(spacerWidth, scale)
     local snappedTotalWidth = SnapToPixel(totalWidth, scale)
@@ -948,7 +1036,9 @@ function Plugin:RepositionSpacers(max)
                 sp:SetHeight(Frame:GetHeight())
                 local centerPos = SnapToPixel(snappedTotalWidth * (i / max), scale)
                 sp:SetPoint("LEFT", Frame, "LEFT", SnapToPixel(centerPos - (snappedSpacerWidth / 2), scale), 0)
-                if OrbitEngine.Pixel then OrbitEngine.Pixel:Enforce(sp) end
+                if OrbitEngine.Pixel then
+                    OrbitEngine.Pixel:Enforce(sp)
+                end
             else
                 sp:Hide()
             end
@@ -1020,11 +1110,15 @@ function Plugin:UpdateLayout(frame)
 end
 
 function Plugin:UpdateContinuousBar(curveKey, current, max)
-    if not Frame.StatusBar then return end
+    if not Frame.StatusBar then
+        return
+    end
     Frame.StatusBar:SetMinMaxValues(0, max)
     Frame.StatusBar:SetValue(current, SMOOTH_ANIM)
     local curveData = self:GetSetting(SYSTEM_INDEX, curveKey)
-    if not curveData then return end
+    if not curveData then
+        return
+    end
 
     -- MANA: use UnitPowerPercent + native ColorCurve (fully secret-safe)
     if self.continuousResource == "MANA" then
@@ -1049,9 +1143,15 @@ function Plugin:UpdateContinuousBar(curveKey, current, max)
 end
 
 function Plugin:UpdateContinuousSpacers(cfg, max)
-    if not Frame or not Frame.StatusBar then return end
+    if not Frame or not Frame.StatusBar then
+        return
+    end
     if not cfg.dividers or max <= 1 then
-        if Frame.Spacers then for _, s in ipairs(Frame.Spacers) do s:Hide() end end
+        if Frame.Spacers then
+            for _, s in ipairs(Frame.Spacers) do
+                s:Hide()
+            end
+        end
         return
     end
 

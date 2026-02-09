@@ -103,6 +103,8 @@ function Orbit.BossFramePreviewMixin:ApplyPreviewVisuals()
                 frame.Power:SetMinMaxValues(0, 100)
                 frame.Power:SetValue(PREVIEW_DEFAULTS.PowerPercent)
                 frame.Power:SetStatusBarColor(0, 0.5, 1)
+                local globalSettings = Orbit.db.GlobalSettings or {}
+                Orbit.Skin:ApplyGradientBackground(frame.Power, globalSettings.BackdropColourCurve, Orbit.Constants.Colors.Background)
                 frame.Power:Show()
             end
 
@@ -170,6 +172,8 @@ function Orbit.BossFramePreviewMixin:ApplyPreviewVisuals()
                     frame.CastBar.bg:SetPoint("TOPLEFT", frame.CastBar, "TOPLEFT", iconOffset, 0)
                     frame.CastBar.bg:SetPoint("BOTTOMRIGHT", frame.CastBar, "BOTTOMRIGHT", 0, 0)
                 end
+                local gs = Orbit.db.GlobalSettings or {}
+                Orbit.Skin:ApplyGradientBackground(frame.CastBar, gs.BackdropColourCurve, Orbit.Constants.Colors.Background)
 
                 if frame.CastBar.Text then
                     frame.CastBar.Text:ClearAllPoints()

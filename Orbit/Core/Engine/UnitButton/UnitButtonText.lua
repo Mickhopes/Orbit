@@ -126,7 +126,6 @@ function TextMixin:UpdateHealthText()
 
     local mode = self.healthTextMode or HEALTH_TEXT_MODES.PERCENT_SHORT
 
-
     if self.healthTextEnabled == false then
         self.HealthText:Hide()
         return
@@ -242,7 +241,9 @@ function TextMixin:UpdateName()
     local maxChars = 15
 
     local frameWidth = self:GetWidth()
-    if issecretvalue and issecretvalue(frameWidth) then frameWidth = 0 end
+    if issecretvalue and issecretvalue(frameWidth) then
+        frameWidth = 0
+    end
     if type(frameWidth) == "number" and frameWidth > 0 then
         -- Estimate HealthText reserved width based on font size (avoids secret value issues)
         -- "100%" is ~4-5 chars, estimate ~0.6x font height per character
@@ -282,9 +283,9 @@ function TextMixin:ApplyNameColor()
         local positions = self.orbitPlugin:GetSetting(systemIndex, "ComponentPositions")
         if positions and positions.Name and positions.Name.overrides then
             local overrides = positions.Name.overrides
-            if overrides.CustomColor and overrides.CustomColorCurve then
+            if overrides.CustomColorCurve then
                 customColorOverride = Engine.WidgetLogic:GetFirstColorFromCurve(overrides.CustomColorCurve)
-            elseif overrides.CustomColor and overrides.CustomColorValue then
+            elseif overrides.CustomColorValue then
                 customColorOverride = overrides.CustomColorValue
             end
         end
@@ -315,9 +316,9 @@ function TextMixin:ApplyHealthTextColor()
         local positions = self.orbitPlugin:GetSetting(systemIndex, "ComponentPositions")
         if positions and positions.HealthText and positions.HealthText.overrides then
             local overrides = positions.HealthText.overrides
-            if overrides.CustomColor and overrides.CustomColorCurve then
+            if overrides.CustomColorCurve then
                 customColorOverride = Engine.WidgetLogic:GetFirstColorFromCurve(overrides.CustomColorCurve)
-            elseif overrides.CustomColor and overrides.CustomColorValue then
+            elseif overrides.CustomColorValue then
                 customColorOverride = overrides.CustomColorValue
             end
         end

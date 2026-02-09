@@ -44,10 +44,14 @@ function CanvasMixin:UpdateTextLayout()
 
     -- Fallback for frames without ComponentPositions (legacy or non-Canvas Mode frames)
     local height = self:GetHeight()
-    if issecretvalue and issecretvalue(height) then height = 40 end
+    if issecretvalue and issecretvalue(height) then
+        height = 40
+    end
     local fontName, fontHeight, fontFlags = self.Name:GetFont()
     fontHeight = fontHeight or 12
-    if issecretvalue and issecretvalue(fontHeight) then fontHeight = 12 end
+    if issecretvalue and issecretvalue(fontHeight) then
+        fontHeight = 12
+    end
 
     local padding = 5
     local estimatedHealthTextWidth = fontHeight * 3
@@ -100,13 +104,17 @@ function CanvasMixin:ApplyComponentPositions()
     end
 
     local width, height = self:GetWidth(), self:GetHeight()
-    if issecretvalue and (issecretvalue(width) or issecretvalue(height)) then return end
+    if issecretvalue and (issecretvalue(width) or issecretvalue(height)) then
+        return
+    end
     if width <= 0 or height <= 0 then
         return
     end
 
     local ApplyTextPosition = Engine.PositionUtils and Engine.PositionUtils.ApplyTextPosition
-    if not ApplyTextPosition then return end
+    if not ApplyTextPosition then
+        return
+    end
 
     -- Apply Name position if saved
     if positions.Name and self.Name then
@@ -168,12 +176,16 @@ function CanvasMixin:ApplyStyleOverrides(positions)
             if overrides.UseClassColour then
                 local _, playerClass = UnitClass("player")
                 local classColor = RAID_CLASS_COLORS[playerClass]
-                if classColor then element:SetTextColor(classColor.r, classColor.g, classColor.b, 1) end
-            elseif overrides.CustomColor and overrides.CustomColorCurve then
+                if classColor then
+                    element:SetTextColor(classColor.r, classColor.g, classColor.b, 1)
+                end
+            elseif overrides.CustomColorCurve then
                 local color = Engine.WidgetLogic:GetFirstColorFromCurve(overrides.CustomColorCurve)
-                if color then element:SetTextColor(color.r or 1, color.g or 1, color.b or 1, color.a or 1) end
-            elseif overrides.CustomColor and type(overrides.CustomColor) == "table" then
-                local c = overrides.CustomColor
+                if color then
+                    element:SetTextColor(color.r or 1, color.g or 1, color.b or 1, color.a or 1)
+                end
+            elseif overrides.CustomColorValue and type(overrides.CustomColorValue) == "table" then
+                local c = overrides.CustomColorValue
                 element:SetTextColor(c.r or 1, c.g or 1, c.b or 1, c.a or 1)
             end
         end

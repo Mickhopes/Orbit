@@ -665,6 +665,7 @@ function Plugin:ApplySettings(systemFrame)
         local color = self:GetSetting(systemIndex, "CastBarColor")
         local fontName = self:GetSetting(systemIndex, "Font")
         local backdropColor = self:GetSetting(systemIndex, "BackdropColour")
+        local globalSettings = Orbit.db.GlobalSettings or {}
 
         Orbit.Skin.CastBar:Apply(bar.orbitBar, {
             texture = texture,
@@ -677,6 +678,7 @@ function Plugin:ApplySettings(systemFrame)
             font = fontName,
             textColor = { r = 1, g = 1, b = 1, a = 1 },
             backdropColor = backdropColor,
+            backdropCurve = globalSettings.BackdropColourCurve,
             sparkColor = OrbitEngine.WidgetLogic:GetFirstColorFromCurve(self:GetSetting(systemIndex, "SparkColorCurve")) or self:GetSetting(systemIndex, "SparkColor") or { r = 1, g = 1, b = 1, a = 1 },
         })
 

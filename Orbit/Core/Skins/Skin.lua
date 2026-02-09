@@ -333,3 +333,52 @@ function Skin:ApplyUnitFrameText(fontString, alignment, fontPath, textSize)
     fontString:SetShadowColor(0, 0, 0, 1)
     fontString:SetShadowOffset(shadow.x, shadow.y)
 end
+
+-- [ GRADIENT BACKGROUND ]--------------------------------------------------------------------------
+function Skin:ApplyGradientBackground(frame, curveData, fallbackColor)
+    if not frame then return end
+    local WL = Engine.WidgetLogic
+    local pins = curveData and curveData.pins
+    local pinCount = pins and #pins or 0
+
+    if pinCount <= 1 then
+        local c = (pinCount == 1 and pins[1].color) or (WL and WL:GetFirstColorFromCurve(curveData)) or fallbackColor or Constants.Colors.Background
+        if frame.bg then frame.bg:SetColorTexture(c.r or 0, c.g or 0, c.b or 0, c.a or 0.5) end
+        if frame._gradientSegments then
+            for _, seg in ipairs(frame._gradientSegments) do seg:Hide() end
+        end
+        return
+    end
+
+    if frame.bg then frame.bg:SetColorTexture(0, 0, 0, 0) end
+
+    frame._gradientSegments = frame._gradientSegments or {}
+    local sorted = {}
+    for _, p in ipairs(pins) do sorted[#sorted + 1] = p end
+    table.sort(sorted, function(a, b) return a.position < b.position end)
+    if sorted[1].position > 0 then table.insert(sorted, 1, { position = 0, color = sorted[1].color }) end
+    if sorted[#sorted].position < 1 then sorted[#sorted + 1] = { position = 1, color = sorted[#sorted].color } end
+
+    local segCount = #sorted - 1
+    for i = 1, segCount do
+        local seg = frame._gradientSegments[i]
+        if not seg then
+            seg = frame:CreateTexture(nil, "BACKGROUND", nil, Constants.Layers and Constants.Layers.BackdropDeep or -8)
+            frame._gradientSegments[i] = seg
+        end
+        local left = sorted[i]
+        local right = sorted[i + 1]
+        local lc, rc = left.color, right.color
+
+        seg:ClearAllPoints()
+        seg:SetPoint("TOPLEFT", frame, "TOPLEFT", frame:GetWidth() * left.position, 0)
+        seg:SetPoint("BOTTOMRIGHT", frame, "TOPLEFT", frame:GetWidth() * right.position, -frame:GetHeight())
+        seg:SetTexture("Interface\\BUTTONS\\WHITE8x8")
+        seg:SetGradient("HORIZONTAL", CreateColor(lc.r, lc.g, lc.b, lc.a or 0.5), CreateColor(rc.r, rc.g, rc.b, rc.a or 0.5))
+        seg:Show()
+    end
+
+    for i = segCount + 1, #frame._gradientSegments do
+        frame._gradientSegments[i]:Hide()
+    end
+end

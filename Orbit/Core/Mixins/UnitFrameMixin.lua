@@ -124,26 +124,17 @@ function Mixin:GetPreviewTextColor(isPlayer, className, reaction)
 end
 
 function Mixin:ApplyPreviewBackdrop(frame)
-    if not frame or not frame.bg then return end
-
+    if not frame then return end
+    self:CreateBackground(frame)
     local globalSettings = Orbit.db.GlobalSettings or {}
-    local backdropColor = (OrbitEngine.WidgetLogic and OrbitEngine.WidgetLogic:GetFirstColorFromCurve(globalSettings.UnitFrameBackdropColourCurve)) or { r = 0.08, g = 0.08, b = 0.08, a = 0.5 }
-    frame.bg:SetColorTexture(backdropColor.r, backdropColor.g, backdropColor.b, backdropColor.a or 0.5)
+    Orbit.Skin:ApplyGradientBackground(frame, globalSettings.UnitFrameBackdropColourCurve, { r = 0.08, g = 0.08, b = 0.08, a = 0.5 })
 end
 
 function Mixin:UpdateBackdropColor(frame, systemIndex, inheritFromPlayer)
     if not frame then return end
-    local bg = self:CreateBackground(frame)
-    if not bg then return end
-
+    self:CreateBackground(frame)
     local globalSettings = Orbit.db.GlobalSettings or {}
-    local color = (OrbitEngine.WidgetLogic and OrbitEngine.WidgetLogic:GetFirstColorFromCurve(globalSettings.UnitFrameBackdropColourCurve))
-    if color and type(color) == "table" then
-        bg:SetColorTexture(color.r or 0, color.g or 0, color.b or 0, color.a or 0.5)
-    else
-        local c = Orbit.Constants.Colors.Background
-        bg:SetColorTexture(c.r, c.g, c.b, c.a)
-    end
+    Orbit.Skin:ApplyGradientBackground(frame, globalSettings.UnitFrameBackdropColourCurve, Orbit.Constants.Colors.Background)
 end
 
 -- [ BASE VISUALS APPLICATION ]

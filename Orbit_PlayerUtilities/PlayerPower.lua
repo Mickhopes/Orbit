@@ -11,29 +11,29 @@ local _, PLAYER_CLASS = UnitClass("player")
 
 -- [ POWER TYPE CURVE CONFIG ]----------------------------------------------------------------------
 local POWER_CURVE_CONFIG = {
-    { key = "ManaColorCurve",        label = "Mana Colour",         powerType = Enum.PowerType.Mana },
-    { key = "RageColorCurve",        label = "Rage Colour",         powerType = Enum.PowerType.Rage },
-    { key = "FocusColorCurve",       label = "Focus Colour",        powerType = Enum.PowerType.Focus },
-    { key = "EnergyColorCurve",      label = "Energy Colour",       powerType = Enum.PowerType.Energy },
-    { key = "RunicPowerColorCurve",  label = "Runic Power Colour",  powerType = Enum.PowerType.RunicPower },
-    { key = "LunarPowerColorCurve",  label = "Astral Power Colour", powerType = Enum.PowerType.LunarPower },
-    { key = "FuryColorCurve",        label = "Fury Colour",         powerType = Enum.PowerType.Fury },
+    { key = "ManaColorCurve", label = "Mana Colour", powerType = Enum.PowerType.Mana },
+    { key = "RageColorCurve", label = "Rage Colour", powerType = Enum.PowerType.Rage },
+    { key = "FocusColorCurve", label = "Focus Colour", powerType = Enum.PowerType.Focus },
+    { key = "EnergyColorCurve", label = "Energy Colour", powerType = Enum.PowerType.Energy },
+    { key = "RunicPowerColorCurve", label = "Runic Power Colour", powerType = Enum.PowerType.RunicPower },
+    { key = "LunarPowerColorCurve", label = "Astral Power Colour", powerType = Enum.PowerType.LunarPower },
+    { key = "FuryColorCurve", label = "Fury Colour", powerType = Enum.PowerType.Fury },
 }
 
 local CLASS_POWER_TYPES = {
-    WARRIOR     = { Enum.PowerType.Rage },
-    PALADIN     = { Enum.PowerType.Mana },
-    HUNTER      = { Enum.PowerType.Focus },
-    ROGUE       = { Enum.PowerType.Energy },
-    PRIEST      = { Enum.PowerType.Mana },
+    WARRIOR = { Enum.PowerType.Rage },
+    PALADIN = { Enum.PowerType.Mana },
+    HUNTER = { Enum.PowerType.Focus },
+    ROGUE = { Enum.PowerType.Energy },
+    PRIEST = { Enum.PowerType.Mana },
     DEATHKNIGHT = { Enum.PowerType.RunicPower },
-    SHAMAN      = { Enum.PowerType.Mana },
-    MAGE        = { Enum.PowerType.Mana },
-    WARLOCK     = { Enum.PowerType.Mana },
-    MONK        = { Enum.PowerType.Energy, Enum.PowerType.Mana },
-    DRUID       = { Enum.PowerType.Energy, Enum.PowerType.Rage, Enum.PowerType.LunarPower, Enum.PowerType.Mana },
+    SHAMAN = { Enum.PowerType.Mana },
+    MAGE = { Enum.PowerType.Mana },
+    WARLOCK = { Enum.PowerType.Mana },
+    MONK = { Enum.PowerType.Energy, Enum.PowerType.Mana },
+    DRUID = { Enum.PowerType.Energy, Enum.PowerType.Rage, Enum.PowerType.LunarPower, Enum.PowerType.Mana },
     DEMONHUNTER = { Enum.PowerType.Fury },
-    EVOKER      = { Enum.PowerType.Mana },
+    EVOKER = { Enum.PowerType.Mana },
 }
 
 local POWER_TYPE_TO_CURVE_KEY = {}
@@ -44,7 +44,9 @@ end
 -- [ HELPERS ]----------------------------------------------------------------------------------------
 local CanUseUnitPowerPercent = (type(UnitPowerPercent) == "function" and CurveConstants and CurveConstants.ScaleTo100)
 local function SafeUnitPowerPercent(unit, resource)
-    if not CanUseUnitPowerPercent then return nil end
+    if not CanUseUnitPowerPercent then
+        return nil
+    end
     local ok, pct = pcall(UnitPowerPercent, unit, resource, false, CurveConstants.ScaleTo100)
     return (ok and pct) or nil
 end
@@ -60,14 +62,14 @@ local Plugin = Orbit:RegisterPlugin("Player Power", SYSTEM_ID, {
         Hidden = false,
         Width = 200,
         Height = 15,
-        ManaColorCurve       = { pins = { { position = 0, color = { r = 0, g = 0, b = 1, a = 1 } } } },
-        RageColorCurve       = { pins = { { position = 0, color = { r = 1, g = 0, b = 0, a = 1 } } } },
-        FocusColorCurve      = { pins = { { position = 0, color = { r = 1, g = 0.5, b = 0.25, a = 1 } } } },
-        EnergyColorCurve     = { pins = { { position = 0, color = { r = 1, g = 1, b = 0, a = 1 } } } },
+        ManaColorCurve = { pins = { { position = 0, color = { r = 0, g = 0, b = 1, a = 1 } } } },
+        RageColorCurve = { pins = { { position = 0, color = { r = 1, g = 0, b = 0, a = 1 } } } },
+        FocusColorCurve = { pins = { { position = 0, color = { r = 1, g = 0.5, b = 0.25, a = 1 } } } },
+        EnergyColorCurve = { pins = { { position = 0, color = { r = 1, g = 1, b = 0, a = 1 } } } },
         RunicPowerColorCurve = { pins = { { position = 0, color = { r = 0, g = 0.82, b = 1, a = 1 } } } },
         LunarPowerColorCurve = { pins = { { position = 0, color = { r = 0.95, g = 0.9, b = 0.6, a = 1 } } } },
-        FuryColorCurve       = { pins = { { position = 0, color = { r = 1, g = 0.6, b = 0.2, a = 1 } } } },
-        EbonMightColorCurve  = { pins = { { position = 0, color = { r = 0.2, g = 0.8, b = 0.4, a = 1 } } } },
+        FuryColorCurve = { pins = { { position = 0, color = { r = 1, g = 0.6, b = 0.2, a = 1 } } } },
+        EbonMightColorCurve = { pins = { { position = 0, color = { r = 0.2, g = 0.8, b = 0.4, a = 1 } } } },
         Opacity = 100,
         OutOfCombatFade = false,
         ShowOnMouseover = true,
@@ -99,7 +101,10 @@ function Plugin:AddSettings(dialog, systemFrame)
         local playerPlugin = Orbit:GetPlugin("Orbit_PlayerFrame")
         if not playerPlugin then
             table.insert(schema.controls, {
-                type = "checkbox", key = "Enabled", label = "Enable", default = true,
+                type = "checkbox",
+                key = "Enabled",
+                label = "Enable",
+                default = true,
                 onChange = function(val)
                     self:SetSetting(systemIndex, "Enabled", val)
                     self:UpdateVisibility()
@@ -114,17 +119,27 @@ function Plugin:AddSettings(dialog, systemFrame)
     elseif currentTab == "Visibility" then
         WL:AddOpacitySettings(self, schema, systemIndex, systemFrame, { step = 5 })
         table.insert(schema.controls, {
-            type = "checkbox", key = "OutOfCombatFade", label = "Out of Combat Fade", default = false,
+            type = "checkbox",
+            key = "OutOfCombatFade",
+            label = "Out of Combat Fade",
+            default = false,
             tooltip = "Hide frame when out of combat with no target",
             onChange = function(val)
                 self:SetSetting(systemIndex, "OutOfCombatFade", val)
-                if Orbit.OOCFadeMixin then Orbit.OOCFadeMixin:RefreshAll() end
-                if dialog.orbitTabCallback then dialog.orbitTabCallback() end
+                if Orbit.OOCFadeMixin then
+                    Orbit.OOCFadeMixin:RefreshAll()
+                end
+                if dialog.orbitTabCallback then
+                    dialog.orbitTabCallback()
+                end
             end,
         })
         if self:GetSetting(systemIndex, "OutOfCombatFade") then
             table.insert(schema.controls, {
-                type = "checkbox", key = "ShowOnMouseover", label = "Show on Mouseover", default = true,
+                type = "checkbox",
+                key = "ShowOnMouseover",
+                label = "Show on Mouseover",
+                default = true,
                 tooltip = "Reveal frame when mousing over it",
                 onChange = function(val)
                     self:SetSetting(systemIndex, "ShowOnMouseover", val)
@@ -135,11 +150,15 @@ function Plugin:AddSettings(dialog, systemFrame)
     elseif currentTab == "Colour" then
         local classPowerTypes = CLASS_POWER_TYPES[PLAYER_CLASS] or {}
         local classPowerLookup = {}
-        for _, pt in ipairs(classPowerTypes) do classPowerLookup[pt] = true end
+        for _, pt in ipairs(classPowerTypes) do
+            classPowerLookup[pt] = true
+        end
         for _, cfg in ipairs(POWER_CURVE_CONFIG) do
             if classPowerLookup[cfg.powerType] then
                 table.insert(schema.controls, {
-                    type = "colorcurve", key = cfg.key, label = cfg.label,
+                    type = "colorcurve",
+                    key = cfg.key,
+                    label = cfg.label,
                     onChange = function(curveData)
                         self:SetSetting(systemIndex, cfg.key, curveData)
                         self:UpdateAll()
@@ -149,7 +168,9 @@ function Plugin:AddSettings(dialog, systemFrame)
         end
         if PLAYER_CLASS == "EVOKER" then
             table.insert(schema.controls, {
-                type = "colorcurve", key = "EbonMightColorCurve", label = "Ebon Might Colour",
+                type = "colorcurve",
+                key = "EbonMightColorCurve",
+                label = "Ebon Might Colour",
                 onChange = function(curveData)
                     self:SetSetting(systemIndex, "EbonMightColorCurve", curveData)
                     self:UpdateAll()
@@ -353,14 +374,9 @@ function Plugin:ApplySettings()
     -- Border
     Frame:SetBorder(borderSize)
 
-    -- Backdrop Color
-    local backdropColor = self:GetSetting(systemIndex, "BackdropColour")
-    if backdropColor and Frame.bg then
-        Frame.bg:SetColorTexture(backdropColor.r, backdropColor.g, backdropColor.b, backdropColor.a or 0.9)
-    elseif Frame.bg then
-        local c = Orbit.Constants.Colors.Background
-        Frame.bg:SetColorTexture(c.r, c.g, c.b, c.a or 0.9)
-    end
+    -- Backdrop Color (gradient-aware)
+    local globalSettings = Orbit.db.GlobalSettings or {}
+    Orbit.Skin:ApplyGradientBackground(Frame, globalSettings.BackdropColourCurve, Orbit.Constants.Colors.Background)
 
     -- Text (controlled via Canvas Mode)
     if OrbitEngine.ComponentDrag:IsDisabled(Frame.Text) then
@@ -382,27 +398,15 @@ function Plugin:ApplySettings()
         -- Apply size override
         local finalSize = overrides.FontSize or textSize
 
-        -- Apply font flags override
-        local flags = Orbit.Skin:GetFontOutline()
-        if overrides.ShowShadow then
-            flags = ""
-        end
-
-        Frame.Text:SetFont(fontPath, finalSize, flags)
-
-        -- Apply shadow if needed
-        if overrides.ShowShadow then
-            Frame.Text:SetShadowOffset(1, -1)
-            Frame.Text:SetShadowColor(0, 0, 0, 1)
-        else
-            Frame.Text:SetShadowOffset(0, 0)
-        end
+        Frame.Text:SetFont(fontPath, finalSize, Orbit.Skin:GetFontOutline())
 
         -- Apply color override
-        if overrides.CustomColor and overrides.CustomColorCurve then
+        if overrides.CustomColorCurve then
             local color = OrbitEngine.WidgetLogic:GetFirstColorFromCurve(overrides.CustomColorCurve)
-            if color then Frame.Text:SetTextColor(color.r or 1, color.g or 1, color.b or 1, color.a or 1) end
-        elseif overrides.CustomColor and overrides.CustomColorValue and type(overrides.CustomColorValue) == "table" then
+            if color then
+                Frame.Text:SetTextColor(color.r or 1, color.g or 1, color.b or 1, color.a or 1)
+            end
+        elseif overrides.CustomColorValue and type(overrides.CustomColorValue) == "table" then
             local c = overrides.CustomColorValue
             Frame.Text:SetTextColor(c.r or 1, c.g or 1, c.b or 1, c.a or 1)
         end
@@ -488,7 +492,9 @@ function Plugin:UpdateAll()
             end
         else
             local color = OrbitEngine.WidgetLogic:GetFirstColorFromCurve(curveData)
-            if color then PowerBar:SetStatusBarColor(color.r, color.g, color.b) end
+            if color then
+                PowerBar:SetStatusBarColor(color.r, color.g, color.b)
+            end
         end
     end
 

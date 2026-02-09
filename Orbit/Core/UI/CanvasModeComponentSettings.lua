@@ -32,15 +32,23 @@ local TYPE_SCHEMAS = {
         controls = {
             { type = "font", key = "Font", label = "Font" },
             { type = "slider", key = "FontSize", label = "Size", min = 8, max = 24, step = 1 },
-            { type = "checkbox", key = "CustomColor", label = "Custom Color" },
-            { type = "colorcurve", key = "CustomColorCurve", label = "Color", showIf = "CustomColor" },
+            { type = "colorcurve", key = "CustomColorCurve", label = "Color" },
         },
     },
     -- Texture/Icon elements (CombatIcon, RareEliteIcon, etc.)
     Texture = {
         controls = {
-            { type = "slider", key = "Scale", label = "Scale", min = 0.5, max = 2.0, step = 0.1,
-                formatter = function(v) return math.floor(v * 100 + 0.5) .. "%" end },
+            {
+                type = "slider",
+                key = "Scale",
+                label = "Scale",
+                min = 0.5,
+                max = 2.0,
+                step = 0.1,
+                formatter = function(v)
+                    return math.floor(v * 100 + 0.5) .. "%"
+                end,
+            },
         },
     },
 }
@@ -323,14 +331,14 @@ function Dialog:Open(componentKey, container, plugin, systemIndex)
             local fontPath = visual:GetFont()
             if fontPath then
                 for name, path in pairs(LSM:HashTable("font")) do
-                    if path == fontPath then return name end
+                    if path == fontPath then
+                        return name
+                    end
                 end
             end
         elseif key == "FontSize" and visual.GetFont then
             local _, size = visual:GetFont()
             return size and math.floor(size + 0.5)
-        elseif key == "CustomColor" then
-            return false
         elseif key == "CustomColorValue" and visual.GetTextColor then
             local r, g, b, a = visual:GetTextColor()
             return { r = r, g = g, b = b, a = a or 1 }
@@ -564,27 +572,10 @@ function Dialog:ApplyStyle(container, key, value)
                 end
             end)
         end
-    elseif key == "CustomColor" and visual.SetTextColor then
-        -- CustomColor checkbox toggled
-        if value then
-            -- Apply custom color value from curve
-            local customColor = OrbitEngine.WidgetLogic:GetFirstColorFromCurve(self.currentOverrides and self.currentOverrides.CustomColorCurve)
-            if customColor then
-                visual:SetTextColor(customColor.r or 1, customColor.g or 1, customColor.b or 1, customColor.a or 1)
-            else
-                visual:SetTextColor(1, 1, 1, 1)
-            end
-        else
-            -- Revert to global font color setting
-            local globalSettings = Orbit.db and Orbit.db.GlobalSettings or {}
-            local fontColor = OrbitEngine.WidgetLogic:GetFirstColorFromCurve(globalSettings.FontColorCurve) or { r = 1, g = 1, b = 1, a = 1 }
-            visual:SetTextColor(fontColor.r, fontColor.g, fontColor.b, fontColor.a or 1)
-        end
     elseif key == "CustomColorCurve" and visual.SetTextColor then
-        -- Color curve changed - only apply if CustomColor is enabled
-        local useCustom = self.currentOverrides and self.currentOverrides.CustomColor
+        -- Color curve changed - apply directly
         local color = OrbitEngine.WidgetLogic:GetFirstColorFromCurve(value)
-        if useCustom and color then
+        if color then
             visual:SetTextColor(color.r or 1, color.g or 1, color.b or 1, color.a or 1)
         end
     elseif key == "Scale" then

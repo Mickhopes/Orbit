@@ -263,25 +263,38 @@ function Plugin:ApplySettings()
     end
 
     -- Text (controlled via Canvas Mode)
+    local fontPath = LSM:Fetch("font", fontName)
+
+    -- Get Canvas Mode overrides
+    local positions = self:GetSetting(systemIndex, "ComponentPositions") or {}
+    local textPos = positions.Text or {}
+    local overrides = textPos.overrides or {}
+
+    -- Apply font override
+    if overrides.Font and LSM then
+        fontPath = LSM:Fetch("font", overrides.Font) or fontPath
+    end
+
     if OrbitEngine.ComponentDrag:IsDisabled(Frame.Text) then
         Frame.Text:Hide()
     else
         Frame.Text:Show()
 
-        -- Check for Canvas Mode overrides for Font Size
-        local textSize = nil
-        local positions = self:GetSetting(systemIndex, "ComponentPositions")
-        if positions and positions.Text and positions.Text.overrides and positions.Text.overrides.FontSize then
-            textSize = positions.Text.overrides.FontSize
-        end
+        -- Apply size override
+        local textSize = overrides.FontSize or Orbit.Skin:GetAdaptiveTextSize(height, 12, 18, 1)
 
-        -- Fallback to adaptive size
-        if not textSize then
-            textSize = Orbit.Skin:GetAdaptiveTextSize(height, 12, 18, 1)
-        end
-
-        local fontPath = LSM:Fetch("font", fontName)
         Frame.Text:SetFont(fontPath, textSize, Orbit.Skin:GetFontOutline())
+
+        -- Apply color override
+        if overrides.CustomColorCurve then
+            local color = OrbitEngine.WidgetLogic:GetFirstColorFromCurve(overrides.CustomColorCurve)
+            if color then
+                Frame.Text:SetTextColor(color.r or 1, color.g or 1, color.b or 1, color.a or 1)
+            end
+        elseif overrides.CustomColorValue and type(overrides.CustomColorValue) == "table" then
+            local c = overrides.CustomColorValue
+            Frame.Text:SetTextColor(c.r or 1, c.g or 1, c.b or 1, c.a or 1)
+        end
 
         Frame.Text:ClearAllPoints()
         Frame.Text:SetPoint("CENTER", Frame.Overlay, "CENTER", 0, 0)

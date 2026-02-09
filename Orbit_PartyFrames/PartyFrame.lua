@@ -197,17 +197,11 @@ local function CreatePowerBar(parent, unit, plugin)
     power:SetValue(0)
     power.unit = unit
 
-    -- Background
+    -- Background (gradient-aware)
     power.bg = power:CreateTexture(nil, "BACKGROUND")
     power.bg:SetAllPoints()
-
-    local color = plugin:GetSetting(1, "BackdropColour")
-    if color then
-        power.bg:SetColorTexture(color.r, color.g, color.b, color.a or 0.5)
-    else
-        local bg = Orbit.Constants.Colors.Background
-        power.bg:SetColorTexture(bg.r, bg.g, bg.b, bg.a)
-    end
+    local globalSettings = Orbit.db.GlobalSettings or {}
+    Orbit.Skin:ApplyGradientBackground(power, globalSettings.BackdropColourCurve, Orbit.Constants.Colors.Background)
 
     return power
 end

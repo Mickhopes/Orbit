@@ -46,15 +46,21 @@ local function ParseActiveDuration(itemType, id)
             end
         end
     end
-    if not text then return nil end
+    if not text then
+        return nil
+    end
     text = StripEscapes(text)
     local best = nil
-    for _, pattern in ipairs({"for (%d+) sec", "lasts (%d+) sec", "over (%d+) sec"}) do
+    for _, pattern in ipairs({ "for (%d+) sec", "lasts (%d+) sec", "over (%d+) sec" }) do
         for num in text:gmatch(pattern) do
             local n = tonumber(num)
-            if not best or n > best then best = n end
+            if not best or n > best then
+                best = n
+            end
         end
-        if best then return best end
+        if best then
+            return best
+        end
     end
     return best
 end
@@ -66,13 +72,19 @@ local function ParseCooldownDuration(itemType, id)
     elseif itemType == "item" then
         tooltipData = C_TooltipInfo and C_TooltipInfo.GetItemByID(id)
     end
-    if not tooltipData or not tooltipData.lines then return nil end
+    if not tooltipData or not tooltipData.lines then
+        return nil
+    end
     for _, line in ipairs(tooltipData.lines) do
         local text = StripEscapes(line.rightText or line.leftText or "")
         local min = text:match("(%d+) [Mm]in [Cc]ooldown")
-        if min then return tonumber(min) * 60 end
+        if min then
+            return tonumber(min) * 60
+        end
         local sec = text:match("(%d+) [Ss]ec [Cc]ooldown")
-        if sec then return tonumber(sec) end
+        if sec then
+            return tonumber(sec)
+        end
     end
     return nil
 end
@@ -112,8 +124,12 @@ end
 
 -- [ PLUGIN REFERENCE ]------------------------------------------------------------------------------
 local Plugin = Orbit:GetPlugin("Orbit_CooldownViewer")
-if not Plugin then error("TrackedAbilities.lua: Plugin 'Orbit_CooldownViewer' not found - ensure CooldownManager.lua loads first") end
-local function GetViewerMap() return Plugin.viewerMap end
+if not Plugin then
+    error("TrackedAbilities.lua: Plugin 'Orbit_CooldownViewer' not found - ensure CooldownManager.lua loads first")
+end
+local function GetViewerMap()
+    return Plugin.viewerMap
+end
 
 -- [ CHILD FRAME MANAGEMENT ]------------------------------------------------------------------------
 Plugin.childFramePool = Plugin.childFramePool or {}
@@ -147,9 +163,13 @@ function Plugin:CreateTrackedAnchor(name, systemIndex, label)
         frame:SetPoint("CENTER", UIParent, "CENTER", -30, 0)
     end
 
-    frame:SetScript("OnReceiveDrag", function() plugin:OnTrackedAnchorReceiveDrag(frame) end)
+    frame:SetScript("OnReceiveDrag", function()
+        plugin:OnTrackedAnchorReceiveDrag(frame)
+    end)
     frame:SetScript("OnMouseDown", function(_, button)
-        if GetCursorInfo() then plugin:OnTrackedAnchorReceiveDrag(frame) end
+        if GetCursorInfo() then
+            plugin:OnTrackedAnchorReceiveDrag(frame)
+        end
     end)
 
     frame.icons = {}
@@ -176,9 +196,17 @@ function Plugin:CreateFrameControlButtons(anchor)
     plusBtn.Icon:SetAllPoints()
     plusBtn.Icon:SetTexture(TRACKED_ADD_ICON)
     plusBtn.Icon:SetVertexColor(COLOR_GREEN.r, COLOR_GREEN.g, COLOR_GREEN.b)
-    plusBtn:SetScript("OnClick", function() if not InCombatLockdown() then plugin:SpawnChildFrame() end end)
-    plusBtn:SetScript("OnEnter", function(self) self.Icon:SetAlpha(1) end)
-    plusBtn:SetScript("OnLeave", function(self) self.Icon:SetAlpha(0.8) end)
+    plusBtn:SetScript("OnClick", function()
+        if not InCombatLockdown() then
+            plugin:SpawnChildFrame()
+        end
+    end)
+    plusBtn:SetScript("OnEnter", function(self)
+        self.Icon:SetAlpha(1)
+    end)
+    plusBtn:SetScript("OnLeave", function(self)
+        self.Icon:SetAlpha(0.8)
+    end)
     plusBtn.Icon:SetAlpha(0.8)
     anchor.plusBtn = plusBtn
 
@@ -190,11 +218,19 @@ function Plugin:CreateFrameControlButtons(anchor)
     minusBtn.Icon:SetTexture(TRACKED_REMOVE_ICON)
     minusBtn.Icon:SetVertexColor(COLOR_RED.r, COLOR_RED.g, COLOR_RED.b)
     minusBtn:SetScript("OnClick", function()
-        if InCombatLockdown() then return end
-        if anchor.isChildFrame then plugin:DespawnChildFrame(anchor) end
+        if InCombatLockdown() then
+            return
+        end
+        if anchor.isChildFrame then
+            plugin:DespawnChildFrame(anchor)
+        end
     end)
-    minusBtn:SetScript("OnEnter", function(self) self.Icon:SetAlpha(1) end)
-    minusBtn:SetScript("OnLeave", function(self) self.Icon:SetAlpha(0.8) end)
+    minusBtn:SetScript("OnEnter", function(self)
+        self.Icon:SetAlpha(1)
+    end)
+    minusBtn:SetScript("OnLeave", function(self)
+        self.Icon:SetAlpha(0.8)
+    end)
     minusBtn.Icon:SetAlpha(0.8)
     anchor.minusBtn = minusBtn
 
@@ -203,7 +239,9 @@ function Plugin:CreateFrameControlButtons(anchor)
 end
 
 function Plugin:UpdateControlButtonVisibility(anchor)
-    if not anchor or not anchor.controlContainer then return end
+    if not anchor or not anchor.controlContainer then
+        return
+    end
     local isEditMode = EditModeManagerFrame and EditModeManagerFrame:IsShown()
     if isEditMode then
         anchor.controlContainer:Show()
@@ -215,7 +253,9 @@ end
 
 function Plugin:UpdateAllControlButtonColors()
     local count = 0
-    for _ in pairs(self.activeChildren) do count = count + 1 end
+    for _ in pairs(self.activeChildren) do
+        count = count + 1
+    end
     local atMax = count >= MAX_CHILD_FRAMES
 
     local viewerMap = GetViewerMap()
@@ -237,33 +277,51 @@ end
 function Plugin:RefreshAllControlButtonVisibility()
     local viewerMap = GetViewerMap()
     local entry = viewerMap[TRACKED_INDEX]
-    if entry and entry.anchor then self:UpdateControlButtonVisibility(entry.anchor) end
+    if entry and entry.anchor then
+        self:UpdateControlButtonVisibility(entry.anchor)
+    end
     for _, childData in pairs(self.activeChildren) do
-        if childData.frame then self:UpdateControlButtonVisibility(childData.frame) end
+        if childData.frame then
+            self:UpdateControlButtonVisibility(childData.frame)
+        end
     end
 end
 
 function Plugin:SetupEditModeHooks()
-    if self.editModeHooksSetup then return end
+    if self.editModeHooksSetup then
+        return
+    end
     self.editModeHooksSetup = true
     local plugin = self
     if EditModeManagerFrame then
-        EditModeManagerFrame:HookScript("OnShow", function() plugin:RefreshAllControlButtonVisibility() end)
-        EditModeManagerFrame:HookScript("OnHide", function() plugin:RefreshAllControlButtonVisibility() end)
+        EditModeManagerFrame:HookScript("OnShow", function()
+            plugin:RefreshAllControlButtonVisibility()
+        end)
+        EditModeManagerFrame:HookScript("OnHide", function()
+            plugin:RefreshAllControlButtonVisibility()
+        end)
     end
 end
 
-
 function Plugin:SpawnChildFrame()
     local count = 0
-    for _, _ in pairs(self.activeChildren) do count = count + 1 end
-    if count >= MAX_CHILD_FRAMES then return nil end
+    for _, _ in pairs(self.activeChildren) do
+        count = count + 1
+    end
+    if count >= MAX_CHILD_FRAMES then
+        return nil
+    end
 
     local slot = nil
     for s = 1, MAX_CHILD_FRAMES do
-        if not self.activeChildren["child:" .. s] then slot = s break end
+        if not self.activeChildren["child:" .. s] then
+            slot = s
+            break
+        end
     end
-    if not slot then return nil end
+    if not slot then
+        return nil
+    end
 
     local key = "child:" .. slot
     local systemIndex = TRACKED_CHILD_START + slot - 1
@@ -276,7 +334,9 @@ function Plugin:SpawnChildFrame()
         frame.systemIndex = systemIndex
         frame.editModeName = label
         OrbitEngine.Frame:AttachSettingsListener(frame, self, systemIndex)
-        for _, icon in pairs(frame.activeIcons or {}) do icon:Hide() end
+        for _, icon in pairs(frame.activeIcons or {}) do
+            icon:Hide()
+        end
         frame.activeIcons = {}
         frame.recyclePool = {}
         frame.gridItems = {}
@@ -306,13 +366,19 @@ function Plugin:SpawnChildFrame()
 end
 
 function Plugin:DespawnChildFrame(frame)
-    if not frame or not frame.isChildFrame then return end
+    if not frame or not frame.isChildFrame then
+        return
+    end
     local key = "child:" .. frame.childSlot
 
     frame:Hide()
     frame:ClearAllPoints()
-    for _, icon in pairs(frame.activeIcons or {}) do icon:Hide() end
-    for _, btn in pairs(frame.edgeButtons or {}) do btn:Hide() end
+    for _, icon in pairs(frame.activeIcons or {}) do
+        icon:Hide()
+    end
+    for _, btn in pairs(frame.edgeButtons or {}) do
+        btn:Hide()
+    end
 
     self:SetSetting(frame.systemIndex, self:GetSpecKey("TrackedItems"), nil)
     self:SetSetting(frame.systemIndex, "Position", nil)
@@ -350,7 +416,9 @@ end
 -- Clear stale anchor/position data from a tracked frame with no items for the current spec.
 -- Handles both directions: outbound (this frame anchored to X) and inbound (X anchored to this frame).
 function Plugin:ClearStaleTrackedSpatial(frame, sysIndex)
-    if not frame or (frame.gridItems and next(frame.gridItems)) then return end
+    if not frame or (frame.gridItems and next(frame.gridItems)) then
+        return
+    end
     self:SetSetting(sysIndex, "Anchor", nil)
     self:SetSetting(sysIndex, "Position", nil)
     if OrbitEngine.FrameAnchor then
@@ -364,17 +432,52 @@ function Plugin:ClearStaleTrackedSpatial(frame, sysIndex)
     end
 end
 
+-- [ COOLDOWN VALIDATION ]---------------------------------------------------------------------------
+local function HasCooldown(itemType, id)
+    if itemType == "spell" then
+        local cd = GetSpellBaseCooldown(id)
+        return cd and cd > 0
+    elseif itemType == "item" then
+        return ParseCooldownDuration("item", id) ~= nil
+    end
+    return false
+end
+
+local function IsDraggingCooldownAbility()
+    local cursorType, id, subType, spellID = GetCursorInfo()
+    if not cursorType then
+        return false
+    end
+    if cursorType == "spell" then
+        local actualId = spellID or id
+        if subType and subType ~= "" then
+            local bookInfo = C_SpellBook.GetSpellBookItemInfo(id, Enum.SpellBookSpellBank[subType] or Enum.SpellBookSpellBank.Player)
+            if bookInfo and bookInfo.spellID then
+                actualId = bookInfo.spellID
+            end
+        end
+        return HasCooldown("spell", actualId)
+    elseif cursorType == "item" then
+        return HasCooldown("item", id)
+    end
+    return false
+end
+
 -- [ DRAG AND DROP ]----------------------------------------------------------------------------------
 function Plugin:OnEdgeAddButtonClick(anchor, x, y)
     local cursorType, id, subType, spellID = GetCursorInfo()
-    if cursorType ~= "spell" and cursorType ~= "item" then return end
+    if cursorType ~= "spell" and cursorType ~= "item" then
+        return
+    end
 
     local actualId = id
     if cursorType == "spell" then
         actualId = spellID or id
         if subType and subType ~= "" then
             local bookInfo = C_SpellBook.GetSpellBookItemInfo(id, Enum.SpellBookSpellBank[subType] or Enum.SpellBookSpellBank.Player)
-            if bookInfo and bookInfo.spellID then actualId = bookInfo.spellID end
+            if bookInfo and bookInfo.spellID then
+                actualId = bookInfo.spellID
+            end
         end
     end
 
@@ -393,19 +496,26 @@ end
 
 function Plugin:OnTrackedIconReceiveDrag(icon)
     local cursorType, id, subType, spellID = GetCursorInfo()
-    if cursorType ~= "spell" and cursorType ~= "item" then return end
+    if cursorType ~= "spell" and cursorType ~= "item" then
+        return
+    end
 
     local actualId = id
     if cursorType == "spell" then
         actualId = spellID or id
         if subType and subType ~= "" then
             local bookInfo = C_SpellBook.GetSpellBookItemInfo(id, Enum.SpellBookSpellBank[subType] or Enum.SpellBookSpellBank.Player)
-            if bookInfo and bookInfo.spellID then actualId = bookInfo.spellID end
+            if bookInfo and bookInfo.spellID then
+                actualId = bookInfo.spellID
+            end
         end
     elseif cursorType == "item" then
         actualId = id
     end
 
+    if not HasCooldown(cursorType, actualId) then
+        return
+    end
     ClearCursor()
     self:SaveTrackedItem(icon.systemIndex, icon.gridX, icon.gridY, cursorType, actualId)
     self:LoadTrackedItems(icon:GetParent(), icon.systemIndex)
@@ -437,7 +547,9 @@ function Plugin:CreateTrackedIcons(anchor, systemIndex)
 end
 
 function Plugin:AcquireTrackedIcon(anchor, systemIndex)
-    if #anchor.recyclePool > 0 then return table.remove(anchor.recyclePool) end
+    if #anchor.recyclePool > 0 then
+        return table.remove(anchor.recyclePool)
+    end
     return self:CreateTrackedIcon(anchor, systemIndex, 0, 0)
 end
 
@@ -493,7 +605,9 @@ function Plugin:CreateTrackedIcon(anchor, systemIndex, x, y)
 
     icon:EnableMouse(true)
     icon:RegisterForDrag("LeftButton")
-    icon:SetScript("OnReceiveDrag", function(self) plugin:OnTrackedIconReceiveDrag(self) end)
+    icon:SetScript("OnReceiveDrag", function(self)
+        plugin:OnTrackedIconReceiveDrag(self)
+    end)
     icon:SetScript("OnMouseDown", function(self, button)
         if button == "RightButton" and IsShiftKeyDown() then
             plugin:ClearTrackedIcon(self)
@@ -507,7 +621,9 @@ end
 
 function Plugin:ApplyTrackedIconSkin(icon, systemIndex)
     local skinSettings = CooldownUtils:BuildSkinSettings(self, systemIndex, { zoom = 8 })
-    if Orbit.Skin and Orbit.Skin.Icons then Orbit.Skin.Icons:ApplyCustom(icon, skinSettings) end
+    if Orbit.Skin and Orbit.Skin.Icons then
+        Orbit.Skin.Icons:ApplyCustom(icon, skinSettings)
+    end
     self:ApplyTrackedTextSettings(icon, systemIndex)
 end
 
@@ -520,21 +636,24 @@ function Plugin:ApplyTrackedTextSettings(icon, systemIndex)
         if not timerText then
             local regions = { cooldown:GetRegions() }
             for _, region in ipairs(regions) do
-                if region:GetObjectType() == "FontString" then timerText = region break end
+                if region:GetObjectType() == "FontString" then
+                    timerText = region
+                    break
+                end
             end
         end
         if timerText then
             local font, size, flags, pos, overrides = CooldownUtils:GetComponentStyle(self, systemIndex, "Timer", 2)
             timerText:SetFont(font, size, flags)
             timerText:SetDrawLayer("OVERLAY", 7)
-            CooldownUtils:ApplyTextShadow(timerText, overrides.ShowShadow)
             CooldownUtils:ApplyTextColor(timerText, overrides)
             local ApplyTextPosition = OrbitEngine.PositionUtils and OrbitEngine.PositionUtils.ApplyTextPosition
-            if ApplyTextPosition then ApplyTextPosition(timerText, icon, pos) end
+            if ApplyTextPosition then
+                ApplyTextPosition(timerText, icon, pos)
+            end
         end
     end
 end
-
 
 -- [ DATA MANAGEMENT ]--------------------------------------------------------------------------------
 function Plugin:ClearTrackedIcon(icon)
@@ -549,7 +668,9 @@ function Plugin:ClearTrackedIcon(icon)
 end
 
 -- [ GRID HELPERS ]-----------------------------------------------------------------------------------
-local function GridKey(x, y) return x .. "," .. y end
+local function GridKey(x, y)
+    return x .. "," .. y
+end
 local function ParseGridKey(key)
     local x, y = key:match("^(-?%d+),(-?%d+)$")
     return tonumber(x), tonumber(y)
@@ -574,7 +695,10 @@ function Plugin:LoadTrackedItems(anchor, systemIndex)
     -- Migration: convert old slot-based data to coordinate-based
     local needsMigration = false
     for key, data in pairs(tracked) do
-        if type(key) == "number" then needsMigration = true break end
+        if type(key) == "number" then
+            needsMigration = true
+            break
+        end
     end
     if needsMigration then
         local migrated = {}
@@ -600,24 +724,36 @@ end
 
 -- [ ICON UPDATES ]-----------------------------------------------------------------------------------
 local function IsSpellUsable(spellId)
-    if not spellId then return false end
+    if not spellId then
+        return false
+    end
     return IsSpellKnown(spellId) or IsPlayerSpell(spellId)
 end
 
 local function IsItemUsable(itemId)
-    if not itemId then return false end
+    if not itemId then
+        return false
+    end
     local usable, noMana = C_Item.IsUsableItem(itemId)
-    if usable or noMana then return true end
+    if usable or noMana then
+        return true
+    end
     return C_Item.GetItemCount(itemId, false, true) > 0
 end
 
 -- [ ACTIVE GLOW HELPERS ]--------------------------------------------------------------------------
 function Plugin:StartActiveGlow(icon)
-    if not LCG then return end
+    if not LCG then
+        return
+    end
     local systemIndex = icon.systemIndex or TRACKED_INDEX
     local glowTypeId = self:GetSetting(systemIndex, "ActiveGlowType")
-    if glowTypeId == nil then glowTypeId = GlowType.None end
-    if glowTypeId == GlowType.None then return end
+    if glowTypeId == nil then
+        glowTypeId = GlowType.None
+    end
+    if glowTypeId == GlowType.None then
+        return
+    end
     local color = self:GetSetting(systemIndex, "ActiveGlowColor") or { r = 0.3, g = 0.8, b = 1, a = 1 }
     local ct = { color.r, color.g, color.b, color.a or 1 }
     if glowTypeId == GlowType.Pixel then
@@ -638,12 +774,18 @@ function Plugin:StartActiveGlow(icon)
 end
 
 function Plugin:StopActiveGlow(icon)
-    if not LCG or not icon._activeGlowing then return end
+    if not LCG or not icon._activeGlowing then
+        return
+    end
     local t = icon._activeGlowType
-    if t == GlowType.Pixel then LCG.PixelGlow_Stop(icon, ACTIVE_GLOW_KEY)
-    elseif t == GlowType.Proc then LCG.ProcGlow_Stop(icon, ACTIVE_GLOW_KEY)
-    elseif t == GlowType.Autocast then LCG.AutoCastGlow_Stop(icon, ACTIVE_GLOW_KEY)
-    elseif t == GlowType.Button then LCG.ButtonGlow_Stop(icon)
+    if t == GlowType.Pixel then
+        LCG.PixelGlow_Stop(icon, ACTIVE_GLOW_KEY)
+    elseif t == GlowType.Proc then
+        LCG.ProcGlow_Stop(icon, ACTIVE_GLOW_KEY)
+    elseif t == GlowType.Autocast then
+        LCG.AutoCastGlow_Stop(icon, ACTIVE_GLOW_KEY)
+    elseif t == GlowType.Button then
+        LCG.ButtonGlow_Stop(icon)
     end
     icon._activeGlowing = false
     icon._activeGlowType = nil
@@ -663,7 +805,10 @@ function Plugin:UpdateTrackedIcon(icon)
 
     if icon.trackedType == "spell" then
         isUsable = IsSpellUsable(icon.trackedId)
-        if not isUsable then icon:Hide() return end
+        if not isUsable then
+            icon:Hide()
+            return
+        end
 
         texture = C_Spell.GetSpellTexture(icon.trackedId)
         if texture then
@@ -693,7 +838,9 @@ function Plugin:UpdateTrackedIcon(icon)
                     icon.Icon:SetDesaturation(0)
                 end
                 icon.ActiveCooldown:Clear()
-                if icon._activeGlowing then Plugin:StopActiveGlow(icon) end
+                if icon._activeGlowing then
+                    Plugin:StopActiveGlow(icon)
+                end
             else
                 durObj = C_Spell.GetSpellCooldownDuration(icon.trackedId)
                 if durObj then
@@ -723,7 +870,9 @@ function Plugin:UpdateTrackedIcon(icon)
                     icon.Cooldown:SetAlpha(1)
                     icon.ActiveCooldown:Clear()
                     icon.Icon:SetDesaturation(0)
-                    if icon._activeGlowing then Plugin:StopActiveGlow(icon) end
+                    if icon._activeGlowing then
+                        Plugin:StopActiveGlow(icon)
+                    end
                 end
             end
             local displayCount = chargeInfo and chargeInfo.currentCharges or C_Spell.GetSpellDisplayCount(icon.trackedId)
@@ -736,7 +885,10 @@ function Plugin:UpdateTrackedIcon(icon)
         end
     elseif icon.trackedType == "item" then
         isUsable = IsItemUsable(icon.trackedId)
-        if not isUsable then icon:Hide() return end
+        if not isUsable then
+            icon:Hide()
+            return
+        end
 
         texture = C_Item.GetItemIconByID(icon.trackedId)
         if texture then
@@ -750,12 +902,16 @@ function Plugin:UpdateTrackedIcon(icon)
                         icon.Icon:SetDesaturation(0)
                         icon.Cooldown:SetAlpha(0)
                         icon.ActiveCooldown:SetCooldown(start, icon.activeDuration)
-                        if not icon._activeGlowing then Plugin:StartActiveGlow(icon) end
+                        if not icon._activeGlowing then
+                            Plugin:StartActiveGlow(icon)
+                        end
                     else
                         icon.Icon:SetDesaturation(1)
                         icon.Cooldown:SetAlpha(1)
                         icon.ActiveCooldown:Clear()
-                        if icon._activeGlowing then Plugin:StopActiveGlow(icon) end
+                        if icon._activeGlowing then
+                            Plugin:StopActiveGlow(icon)
+                        end
                     end
                 else
                     icon.Icon:SetDesaturation(1)
@@ -767,7 +923,9 @@ function Plugin:UpdateTrackedIcon(icon)
                 icon.Cooldown:SetAlpha(1)
                 icon.ActiveCooldown:Clear()
                 icon.Icon:SetDesaturation(0)
-                if icon._activeGlowing then Plugin:StopActiveGlow(icon) end
+                if icon._activeGlowing then
+                    Plugin:StopActiveGlow(icon)
+                end
             end
             local count = C_Item.GetItemCount(icon.trackedId, false, true)
             if count and count > 1 then
@@ -792,24 +950,31 @@ end
 
 function Plugin:ApplyTimerTextColor(icon, durObj)
     local cooldown = icon.Cooldown
-    if not cooldown then return end
+    if not cooldown then
+        return
+    end
 
     local timerText = cooldown.Text
     if not timerText then
         local regions = { cooldown:GetRegions() }
         for _, region in ipairs(regions) do
-            if region:GetObjectType() == "FontString" then timerText = region break end
+            if region:GetObjectType() == "FontString" then
+                timerText = region
+                break
+            end
         end
         cooldown.Text = timerText
     end
-    if not timerText then return end
+    if not timerText then
+        return
+    end
 
     local systemIndex = icon.systemIndex or TRACKED_INDEX
     local positions = self:GetSetting(systemIndex, "ComponentPositions") or {}
     local timerPos = positions["Timer"] or {}
     local overrides = timerPos.overrides or {}
 
-    if durObj and overrides.CustomColor and overrides.CustomColorCurve then
+    if durObj and overrides.CustomColorCurve then
         local wowColorCurve = OrbitEngine.WidgetLogic:ToNativeColorCurve(overrides.CustomColorCurve)
         if wowColorCurve then
             local secretColor = durObj:EvaluateRemainingPercent(wowColorCurve)
@@ -822,21 +987,31 @@ function Plugin:ApplyTimerTextColor(icon, durObj)
 end
 
 function Plugin:UpdateTrackedIconsDisplay(anchor)
-    if not anchor or not anchor.activeIcons then return end
+    if not anchor or not anchor.activeIcons then
+        return
+    end
     for _, icon in pairs(anchor.activeIcons) do
-        if icon.trackedId then self:UpdateTrackedIcon(icon) end
+        if icon.trackedId then
+            self:UpdateTrackedIcon(icon)
+        end
     end
 end
 
 local function IsGridItemUsable(data)
-    if data.type == "spell" then return IsSpellUsable(data.id) end
-    if data.type == "item" then return IsItemUsable(data.id) end
+    if data.type == "spell" then
+        return IsSpellUsable(data.id)
+    end
+    if data.type == "item" then
+        return IsItemUsable(data.id)
+    end
     return false
 end
 
 -- [ LAYOUT ]-----------------------------------------------------------------------------------------
 function Plugin:LayoutTrackedIcons(anchor, systemIndex)
-    if not anchor then return end
+    if not anchor then
+        return
+    end
 
     local iconWidth, iconHeight = CooldownUtils:CalculateIconDimensions(self, systemIndex)
     local rawPadding = self:GetSetting(systemIndex, "IconPadding") or Constants.Cooldown.DefaultPadding
@@ -844,18 +1019,24 @@ function Plugin:LayoutTrackedIcons(anchor, systemIndex)
     local padding = Pixel and Pixel:Snap(rawPadding) or rawPadding
 
     local rawGridItems = anchor.gridItems or {}
-    local isDragging = GetCursorInfo() ~= nil
+    local isDragging = IsDraggingCooldownAbility()
     local isEditMode = EditModeManagerFrame and EditModeManagerFrame:IsShown()
 
     -- Filter to only usable items (prevents cross-character ability bleed)
     local gridItems = {}
     for key, data in pairs(rawGridItems) do
-        if IsGridItemUsable(data) then gridItems[key] = data end
+        if IsGridItemUsable(data) then
+            gridItems[key] = data
+        end
     end
 
     -- Hide all existing icons and edge buttons
-    for _, icon in pairs(anchor.activeIcons or {}) do icon:Hide() end
-    for _, btn in pairs(anchor.edgeButtons or {}) do btn:Hide() end
+    for _, icon in pairs(anchor.activeIcons or {}) do
+        icon:Hide()
+    end
+    for _, btn in pairs(anchor.edgeButtons or {}) do
+        btn:Hide()
+    end
 
     -- Calculate grid bounds from usable items only
     local minX, maxX, minY, maxY
@@ -872,13 +1053,16 @@ function Plugin:LayoutTrackedIcons(anchor, systemIndex)
             end
         end
     end
-    if not hasItems then minX, maxX, minY, maxY = 0, 0, 0, 0 end
-
+    if not hasItems then
+        minX, maxX, minY, maxY = 0, 0, 0, 0
+    end
 
     -- Handle empty grid
     if not hasItems then
         -- Hide placeholders when showing seed button
-        for _, placeholder in ipairs(anchor.placeholders or {}) do placeholder:Hide() end
+        for _, placeholder in ipairs(anchor.placeholders or {}) do
+            placeholder:Hide()
+        end
 
         -- Show seed button in edit mode OR when dragging
         if isEditMode or isDragging then
@@ -911,23 +1095,38 @@ function Plugin:LayoutTrackedIcons(anchor, systemIndex)
             btn.Plus:SetSize(plusSize, plusSize)
             btn:ClearAllPoints()
             btn:SetPoint("TOPLEFT", anchor, "TOPLEFT", 0, 0)
-            btn:SetScript("OnMouseDown", function() self:OnEdgeAddButtonClick(anchor, 0, 0) end)
+            btn:SetScript("OnMouseDown", function()
+                self:OnEdgeAddButtonClick(anchor, 0, 0)
+            end)
             btn:Show()
-            if isDragging then btn.PulseAnim:Play() else btn.PulseAnim:Stop() btn.Glow:SetAlpha(0.6) end
+            if isDragging then
+                btn.PulseAnim:Play()
+            else
+                btn.PulseAnim:Stop()
+                btn.Glow:SetAlpha(0.6)
+            end
             anchor:SetSize(iconWidth, iconHeight)
         else
-            for _, b in pairs(anchor.edgeButtons or {}) do b:Hide() end
+            for _, b in pairs(anchor.edgeButtons or {}) do
+                b:Hide()
+            end
             anchor:SetSize(iconWidth, iconHeight)
         end
         return
     end
 
     -- Hide placeholders
-    for _, placeholder in ipairs(anchor.placeholders or {}) do placeholder:Hide() end
+    for _, placeholder in ipairs(anchor.placeholders or {}) do
+        placeholder:Hide()
+    end
 
     -- Initialize pools if needed
-    if not anchor.recyclePool then anchor.recyclePool = {} end
-    if not anchor.activeIcons then anchor.activeIcons = {} end
+    if not anchor.recyclePool then
+        anchor.recyclePool = {}
+    end
+    if not anchor.activeIcons then
+        anchor.activeIcons = {}
+    end
 
     -- Release all icons to pool for redistribution
     self:ReleaseTrackedIcons(anchor)
@@ -967,12 +1166,19 @@ function Plugin:LayoutTrackedIcons(anchor, systemIndex)
             icon.ActiveCooldown:SetPoint("TOPLEFT", icon, "TOPLEFT", 0, 0)
             icon.ActiveCooldown:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", 0, 0)
         end
-        if icon.TextOverlay then icon.TextOverlay:SetAllPoints() end
-        if icon.DropHighlight then icon.DropHighlight:SetAllPoints() end
+        if icon.TextOverlay then
+            icon.TextOverlay:SetAllPoints()
+        end
+        if icon.DropHighlight then
+            icon.DropHighlight:SetAllPoints()
+        end
 
         local posX = (x - minX) * (iconWidth + padding)
         local posY = -(y - minY) * (iconHeight + padding)
-        if Pixel then posX = Pixel:Snap(posX) posY = Pixel:Snap(posY) end
+        if Pixel then
+            posX = Pixel:Snap(posX)
+            posY = Pixel:Snap(posY)
+        end
         icon:ClearAllPoints()
         icon:SetPoint("TOPLEFT", anchor, "TOPLEFT", posX, posY)
         icon:Show()
@@ -1004,20 +1210,28 @@ function Plugin:LayoutTrackedIcons(anchor, systemIndex)
                 -- If anchored via TOP → our BOTTOM touches parent → block downward (y+1)
                 -- If anchored via LEFT → our RIGHT touches parent → block leftward (x-1)
                 -- If anchored via RIGHT → our LEFT touches parent → block rightward (x+1)
-                if anchorData.edge == "BOTTOM" then blockedDirections.top = true
-                elseif anchorData.edge == "TOP" then blockedDirections.bottom = true
-                elseif anchorData.edge == "LEFT" then blockedDirections.right = true
-                elseif anchorData.edge == "RIGHT" then blockedDirections.left = true
+                if anchorData.edge == "BOTTOM" then
+                    blockedDirections.top = true
+                elseif anchorData.edge == "TOP" then
+                    blockedDirections.bottom = true
+                elseif anchorData.edge == "LEFT" then
+                    blockedDirections.right = true
+                elseif anchorData.edge == "RIGHT" then
+                    blockedDirections.left = true
                 end
             end
 
             -- Check if something is anchored TO us (we are the parent)
             for child, childAnchor in pairs(FrameAnchor.anchors or {}) do
                 if childAnchor.parent == anchor then
-                    if childAnchor.edge == "TOP" then blockedDirections.top = true
-                    elseif childAnchor.edge == "BOTTOM" then blockedDirections.bottom = true
-                    elseif childAnchor.edge == "LEFT" then blockedDirections.left = true
-                    elseif childAnchor.edge == "RIGHT" then blockedDirections.right = true
+                    if childAnchor.edge == "TOP" then
+                        blockedDirections.top = true
+                    elseif childAnchor.edge == "BOTTOM" then
+                        blockedDirections.bottom = true
+                    elseif childAnchor.edge == "LEFT" then
+                        blockedDirections.left = true
+                    elseif childAnchor.edge == "RIGHT" then
+                        blockedDirections.right = true
                     end
                 end
             end
@@ -1034,10 +1248,18 @@ function Plugin:LayoutTrackedIcons(anchor, systemIndex)
                 local blockTop = blockedDirections.top and y == minY
                 local blockBottom = blockedDirections.bottom and y == maxY
 
-                if not blockLeft then table.insert(neighbors, { x = x - 1, y = y }) end
-                if not blockRight then table.insert(neighbors, { x = x + 1, y = y }) end
-                if not blockTop then table.insert(neighbors, { x = x, y = y - 1 }) end
-                if not blockBottom then table.insert(neighbors, { x = x, y = y + 1 }) end
+                if not blockLeft then
+                    table.insert(neighbors, { x = x - 1, y = y })
+                end
+                if not blockRight then
+                    table.insert(neighbors, { x = x + 1, y = y })
+                end
+                if not blockTop then
+                    table.insert(neighbors, { x = x, y = y - 1 })
+                end
+                if not blockBottom then
+                    table.insert(neighbors, { x = x, y = y + 1 })
+                end
 
                 for _, n in ipairs(neighbors) do
                     local nKey = GridKey(n.x, n.y)
@@ -1088,7 +1310,9 @@ function Plugin:LayoutTrackedIcons(anchor, systemIndex)
 
             btn.edgeX = pos.x
             btn.edgeY = pos.y
-            btn:SetScript("OnMouseDown", function() self:OnEdgeAddButtonClick(anchor, pos.x, pos.y) end)
+            btn:SetScript("OnMouseDown", function()
+                self:OnEdgeAddButtonClick(anchor, pos.x, pos.y)
+            end)
 
             btn:SetSize(iconWidth, iconHeight)
             local plusSize = Pixel and Pixel:Snap(math.min(iconWidth, iconHeight) * 0.4) or (math.min(iconWidth, iconHeight) * 0.4)
@@ -1096,7 +1320,10 @@ function Plugin:LayoutTrackedIcons(anchor, systemIndex)
 
             local posX = (pos.x - extendedMinX) * (iconWidth + padding)
             local posY = -(pos.y - extendedMinY) * (iconHeight + padding)
-            if Pixel then posX = Pixel:Snap(posX) posY = Pixel:Snap(posY) end
+            if Pixel then
+                posX = Pixel:Snap(posX)
+                posY = Pixel:Snap(posY)
+            end
             btn:ClearAllPoints()
             btn:SetPoint("TOPLEFT", anchor, "TOPLEFT", posX, posY)
             btn:Show()
@@ -1113,7 +1340,10 @@ function Plugin:LayoutTrackedIcons(anchor, systemIndex)
         for key, icon in pairs(anchor.activeIcons) do
             local posX = (icon.gridX - extendedMinX) * (iconWidth + padding)
             local posY = -(icon.gridY - extendedMinY) * (iconHeight + padding)
-            if Pixel then posX = Pixel:Snap(posX) posY = Pixel:Snap(posY) end
+            if Pixel then
+                posX = Pixel:Snap(posX)
+                posY = Pixel:Snap(posY)
+            end
             icon:ClearAllPoints()
             icon:SetPoint("TOPLEFT", anchor, "TOPLEFT", posX, posY)
         end
@@ -1124,19 +1354,25 @@ end
 
 -- [ TICKER ]-----------------------------------------------------------------------------------------
 function Plugin:StartTrackedUpdateTicker()
-    if self.trackedTicker then return end
+    if self.trackedTicker then
+        return
+    end
     local viewerMap = GetViewerMap()
     self.trackedTicker = C_Timer.NewTicker(Constants.Timing.IconMonitorInterval, function()
         local entry = viewerMap[TRACKED_INDEX]
         if entry and entry.anchor and entry.anchor.activeIcons then
             for _, icon in pairs(entry.anchor.activeIcons) do
-                if icon.trackedId then self:UpdateTrackedIcon(icon) end
+                if icon.trackedId then
+                    self:UpdateTrackedIcon(icon)
+                end
             end
         end
         for _, childData in pairs(self.activeChildren) do
             if childData.frame and childData.frame.activeIcons then
                 for _, icon in pairs(childData.frame.activeIcons) do
-                    if icon.trackedId then self:UpdateTrackedIcon(icon) end
+                    if icon.trackedId then
+                        self:UpdateTrackedIcon(icon)
+                    end
                 end
             end
         end
@@ -1147,7 +1383,9 @@ end
 function Plugin:ReparseActiveDurations()
     local viewerMap = GetViewerMap()
     local function ReparseAnchor(anchor, systemIndex)
-        if not anchor then return end
+        if not anchor then
+            return
+        end
         local tracked = self:GetSetting(systemIndex, self:GetSpecKey("TrackedItems")) or {}
         local changed = false
         for key, data in pairs(tracked) do
@@ -1161,7 +1399,9 @@ function Plugin:ReparseActiveDurations()
                 end
             end
         end
-        if changed then self:SetSetting(systemIndex, self:GetSpecKey("TrackedItems"), tracked) end
+        if changed then
+            self:SetSetting(systemIndex, self:GetSpecKey("TrackedItems"), tracked)
+        end
         for _, icon in pairs(anchor.activeIcons or {}) do
             local key = icon.gridX .. "," .. icon.gridY
             local data = tracked[key]
@@ -1175,14 +1415,20 @@ function Plugin:ReparseActiveDurations()
         end
     end
     local entry = viewerMap[TRACKED_INDEX]
-    if entry and entry.anchor then ReparseAnchor(entry.anchor, TRACKED_INDEX) end
+    if entry and entry.anchor then
+        ReparseAnchor(entry.anchor, TRACKED_INDEX)
+    end
     for _, childData in pairs(self.activeChildren) do
-        if childData.frame then ReparseAnchor(childData.frame, childData.systemIndex) end
+        if childData.frame then
+            ReparseAnchor(childData.frame, childData.systemIndex)
+        end
     end
 end
 
 function Plugin:RegisterTalentWatcher()
-    if self.talentWatcherSetup then return end
+    if self.talentWatcherSetup then
+        return
+    end
     self.talentWatcherSetup = true
     local plugin = self
     local frame = CreateFrame("Frame")
@@ -1217,16 +1463,22 @@ end
 
 -- [ SPELL CAST WATCHER ]-----------------------------------------------------------------------------
 function Plugin:RegisterSpellCastWatcher()
-    if self.spellCastWatcherSetup then return end
+    if self.spellCastWatcherSetup then
+        return
+    end
     self.spellCastWatcherSetup = true
     local plugin = self
     local viewerMap = GetViewerMap()
     local frame = CreateFrame("Frame")
     frame:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
     frame:SetScript("OnEvent", function(_, _, unit, _, spellId)
-        if unit ~= "player" then return end
+        if unit ~= "player" then
+            return
+        end
         local function CheckAnchor(anchor)
-            if not anchor or not anchor.activeIcons then return end
+            if not anchor or not anchor.activeIcons then
+                return
+            end
             for _, icon in pairs(anchor.activeIcons) do
                 if icon.trackedType == "spell" and icon.trackedId == spellId and icon.activeDuration then
                     icon._activeGlowExpiry = GetTime() + icon.activeDuration
@@ -1234,9 +1486,13 @@ function Plugin:RegisterSpellCastWatcher()
             end
         end
         local entry = viewerMap[TRACKED_INDEX]
-        if entry and entry.anchor then CheckAnchor(entry.anchor) end
+        if entry and entry.anchor then
+            CheckAnchor(entry.anchor)
+        end
         for _, childData in pairs(plugin.activeChildren) do
-            if childData.frame then CheckAnchor(childData.frame) end
+            if childData.frame then
+                CheckAnchor(childData.frame)
+            end
         end
     end)
 end
@@ -1250,17 +1506,22 @@ function Plugin:RegisterCursorWatcher()
     frame:SetScript("OnUpdate", function()
         local cursorType = GetCursorInfo()
         local isEditMode = EditModeManagerFrame and EditModeManagerFrame:IsShown()
-        if cursorType == lastCursor and isEditMode == lastEditMode then return end
+        if cursorType == lastCursor and isEditMode == lastEditMode then
+            return
+        end
         lastCursor = cursorType
         lastEditMode = isEditMode
-        local isDroppable = cursorType == "spell" or cursorType == "item"
+        local isDroppable = IsDraggingCooldownAbility()
         local entry = viewerMap[TRACKED_INDEX]
         if entry and entry.anchor then
             local anchor = entry.anchor
             self:LayoutTrackedIcons(anchor, TRACKED_INDEX)
-            if isDroppable then anchor.DropHighlight:Show() else anchor.DropHighlight:Hide() end
+            if isDroppable then
+                anchor.DropHighlight:Show()
+            else
+                anchor.DropHighlight:Hide()
+            end
         end
-        -- Also update child frames
         for _, childData in pairs(self.activeChildren) do
             if childData.frame then
                 self:LayoutTrackedIcons(childData.frame, childData.systemIndex)
@@ -1319,7 +1580,9 @@ function Plugin:SetupTrackedCanvasPreview(anchor, systemIndex)
         end
         preview:SetBackdrop(backdrop)
         preview:SetBackdropColor(0, 0, 0, 0)
-        if borderSize > 0 then preview:SetBackdropBorderColor(0, 0, 0, 1) end
+        if borderSize > 0 then
+            preview:SetBackdropBorderColor(0, 0, 0, 1)
+        end
 
         local savedPositions = plugin:GetSetting(systemIndex, "ComponentPositions") or {}
         local globalFontName = Orbit.db.GlobalSettings.Font
@@ -1355,12 +1618,18 @@ function Plugin:SetupTrackedCanvasPreview(anchor, systemIndex)
             local startX, startY = saved.posX or 0, saved.posY or 0
 
             if not saved.posX then
-                if data.anchorX == "LEFT" then startX = -halfW + data.offsetX
-                elseif data.anchorX == "RIGHT" then startX = halfW - data.offsetX end
+                if data.anchorX == "LEFT" then
+                    startX = -halfW + data.offsetX
+                elseif data.anchorX == "RIGHT" then
+                    startX = halfW - data.offsetX
+                end
             end
             if not saved.posY then
-                if data.anchorY == "BOTTOM" then startY = -halfH + data.offsetY
-                elseif data.anchorY == "TOP" then startY = halfH - data.offsetY end
+                if data.anchorY == "BOTTOM" then
+                    startY = -halfH + data.offsetY
+                elseif data.anchorY == "TOP" then
+                    startY = halfH - data.offsetY
+                end
             end
 
             if CreateDraggableComponent then
@@ -1382,8 +1651,12 @@ end
 
 -- [ SETTINGS ]----------------------------------------------------------------------------------------
 function Plugin:ApplyTrackedSettings(anchor)
-    if not anchor then return end
-    if InCombatLockdown() then return end
+    if not anchor then
+        return
+    end
+    if InCombatLockdown() then
+        return
+    end
 
     local systemIndex = anchor.systemIndex
     local alpha = self:GetSetting(systemIndex, "Opacity") or 100

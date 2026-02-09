@@ -113,14 +113,11 @@ function ClassBar:SkinStatusBar(container, bar, settings)
         bar:SetStatusBarTexture(texture)
     end
 
-    -- Background Color - use provided backColor or fallback to constant
-    local bg = Orbit.Constants.Colors.Background
-    if settings.backColor then
-        bg = settings.backColor
-    end
-    -- Ensure deep sublayer on every update (like SkinButton)
-    container.orbitBg:SetDrawLayer("BACKGROUND", Orbit.Constants.Layers.BackdropDeep)
-    container.orbitBg:SetColorTexture(bg.r, bg.g, bg.b, bg.a or 1)
+    -- Background Color (gradient-aware)
+    container.bg = container.orbitBg
+    local globalSettings = Orbit.db.GlobalSettings or {}
+    local fallback = settings.backColor or Orbit.Constants.Colors.Background
+    Skin:ApplyGradientBackground(container, globalSettings.BackdropColourCurve, fallback)
 
     -- Ensure Bar Fills Container (No Inset)
     bar:ClearAllPoints()

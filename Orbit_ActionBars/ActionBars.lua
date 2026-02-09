@@ -186,7 +186,11 @@ function Plugin:AddSettings(dialog, systemFrame)
     -- Vehicle Exit: simple scale-only config
     if systemIndex == VEHICLE_EXIT_INDEX then
         WL:AddSizeSettings(self, schema, systemIndex, systemFrame, nil, nil, {
-            key = "Scale", label = "Scale", default = 100, min = 50, max = 150,
+            key = "Scale",
+            label = "Scale",
+            default = 100,
+            min = 50,
+            max = 150,
         })
         Orbit.Config:Render(dialog, systemFrame, self, schema)
         return
@@ -198,18 +202,30 @@ function Plugin:AddSettings(dialog, systemFrame)
     if currentTab == "Layout" then
         if systemIndex == 1 then
             table.insert(schema.controls, {
-                type = "slider", key = "NumActionBars", label = "|cFFFFD100# Action Bars|r",
-                default = 4, min = 2, max = 8, step = 1, updateOnRelease = true,
+                type = "slider",
+                key = "NumActionBars",
+                label = "|cFFFFD100# Action Bars|r",
+                default = 4,
+                min = 2,
+                max = 8,
+                step = 1,
+                updateOnRelease = true,
                 onChange = function(val)
                     local current = Plugin:GetSetting(1, "NumActionBars") or 4
-                    if current == val then return end
+                    if current == val then
+                        return
+                    end
                     Plugin:SetSetting(1, "NumActionBars", val)
                     Plugin:ApplyAll()
                 end,
             })
         end
         WL:AddSizeSettings(self, schema, systemIndex, systemFrame, nil, nil, {
-            key = "Scale", label = "Scale", default = 100, min = 50, max = 150,
+            key = "Scale",
+            label = "Scale",
+            default = 100,
+            min = 50,
+            max = 150,
         })
         table.insert(schema.controls, { type = "slider", key = "IconPadding", label = "Padding", min = -1, max = 10, step = 1, default = 2 })
 
@@ -217,44 +233,71 @@ function Plugin:AddSettings(dialog, systemFrame)
         local isSpecialBar = config.isSpecial or SPECIAL_BAR_INDICES[systemIndex]
         if config and config.count > 1 and not isSpecialBar then
             table.insert(schema.controls, {
-                type = "slider", key = "NumIcons", label = "# Icons",
-                min = 1, max = config.count, step = 1, default = config.count,
+                type = "slider",
+                key = "NumIcons",
+                label = "# Icons",
+                min = 1,
+                max = config.count,
+                step = 1,
+                default = config.count,
                 onChange = function(val)
                     self:SetSetting(systemIndex, "NumIcons", val)
                     local currentRows = self:GetSetting(systemIndex, "Rows") or 1
-                    if val % currentRows ~= 0 then self:SetSetting(systemIndex, "Rows", 1) end
-                    if self.refreshTimer then self.refreshTimer:Cancel() end
+                    if val % currentRows ~= 0 then
+                        self:SetSetting(systemIndex, "Rows", 1)
+                    end
+                    if self.refreshTimer then
+                        self.refreshTimer:Cancel()
+                    end
                     self.refreshTimer = C_Timer.NewTimer(0.2, function()
-                        if dialog.orbitTabCallback then dialog.orbitTabCallback() end
+                        if dialog.orbitTabCallback then
+                            dialog.orbitTabCallback()
+                        end
                     end)
-                    if self.ApplySettings then self:ApplySettings(container) end
+                    if self.ApplySettings then
+                        self:ApplySettings(container)
+                    end
                 end,
             })
         end
         local numIcons = self:GetSetting(systemIndex, "NumIcons") or (config and config.count or 12)
         local factors = {}
         for i = 1, numIcons do
-            if numIcons % i == 0 then table.insert(factors, i) end
+            if numIcons % i == 0 then
+                table.insert(factors, i)
+            end
         end
         local currentRows = self:GetSetting(systemIndex, "Rows") or 1
         local currentIndex = 1
         for i, v in ipairs(factors) do
-            if v == currentRows then currentIndex = i; break end
+            if v == currentRows then
+                currentIndex = i
+                break
+            end
         end
         if #factors > 1 then
             table.insert(schema.controls, {
-                type = "slider", key = "Rows_Slider", label = "Layout",
-                min = 1, max = #factors, step = 1, default = currentIndex,
+                type = "slider",
+                key = "Rows_Slider",
+                label = "Layout",
+                min = 1,
+                max = #factors,
+                step = 1,
+                default = currentIndex,
                 formatter = function(v)
                     local rows = factors[v]
-                    if not rows then return "" end
+                    if not rows then
+                        return ""
+                    end
                     return rows .. " Row" .. (rows > 1 and "s" or "")
                 end,
                 onChange = function(val)
                     local rows = factors[val]
                     if rows then
                         self:SetSetting(systemIndex, "Rows", rows)
-                        if self.ApplySettings then self:ApplySettings(container) end
+                        if self.ApplySettings then
+                            self:ApplySettings(container)
+                        end
                     end
                 end,
             })
@@ -266,17 +309,27 @@ function Plugin:AddSettings(dialog, systemFrame)
     elseif currentTab == "Visibility" then
         WL:AddOpacitySettings(self, schema, systemIndex, systemFrame, { step = 5 })
         table.insert(schema.controls, {
-            type = "checkbox", key = "OutOfCombatFade", label = "Out of Combat Fade", default = false,
+            type = "checkbox",
+            key = "OutOfCombatFade",
+            label = "Out of Combat Fade",
+            default = false,
             tooltip = "Hide frame when out of combat with no target",
             onChange = function(val)
                 self:SetSetting(systemIndex, "OutOfCombatFade", val)
-                if Orbit.OOCFadeMixin then Orbit.OOCFadeMixin:RefreshAll() end
-                if dialog.orbitTabCallback then dialog.orbitTabCallback() end
+                if Orbit.OOCFadeMixin then
+                    Orbit.OOCFadeMixin:RefreshAll()
+                end
+                if dialog.orbitTabCallback then
+                    dialog.orbitTabCallback()
+                end
             end,
         })
         if self:GetSetting(systemIndex, "OutOfCombatFade") then
             table.insert(schema.controls, {
-                type = "checkbox", key = "ShowOnMouseover", label = "Show on Mouseover", default = true,
+                type = "checkbox",
+                key = "ShowOnMouseover",
+                label = "Show on Mouseover",
+                default = true,
                 tooltip = "Reveal hidden frame when mousing over it",
                 onChange = function(val)
                     self:SetSetting(systemIndex, "ShowOnMouseover", val)
@@ -286,13 +339,19 @@ function Plugin:AddSettings(dialog, systemFrame)
         end
     end
 
-    schema.extraButtons = { {
-        text = "Quick Keybind",
-        callback = function()
-            if EditModeManagerFrame and EditModeManagerFrame:IsShown() then HideUIPanel(EditModeManagerFrame) end
-            if QuickKeybindFrame then QuickKeybindFrame:Show() end
-        end,
-    } }
+    schema.extraButtons = {
+        {
+            text = "Quick Keybind",
+            callback = function()
+                if EditModeManagerFrame and EditModeManagerFrame:IsShown() then
+                    HideUIPanel(EditModeManagerFrame)
+                end
+                if QuickKeybindFrame then
+                    QuickKeybindFrame:Show()
+                end
+            end,
+        },
+    }
 
     Orbit.Config:Render(dialog, systemFrame, self, schema)
 end
@@ -374,7 +433,9 @@ end
 
 -- [ VEHICLE EXIT BUTTON ]------------------------------------------------------------------------
 function Plugin:CreateVehicleExitButton()
-    if InCombatLockdown() then return end
+    if InCombatLockdown() then
+        return
+    end
 
     -- Container controls Edit Mode size and position
     local container = CreateFrame("Frame", "OrbitVehicleExit", UIParent, "SecureHandlerStateTemplate")
@@ -620,11 +681,8 @@ function Plugin:ApplyTextSettings(button, systemIndex)
         -- Size override
         local size = overrides.FontSize or defaultSize
 
-        -- Flags override (shadow vs outline)
+        -- Flags
         local flags = Orbit.Skin:GetFontOutline()
-        if overrides.ShowShadow then
-            flags = ""
-        end
 
         return font, size, flags, pos, overrides
     end
@@ -644,10 +702,12 @@ function Plugin:ApplyTextSettings(button, systemIndex)
             if classColor then
                 textElement:SetTextColor(classColor.r, classColor.g, classColor.b, 1)
             end
-        elseif overrides.CustomColor and overrides.CustomColorCurve then
+        elseif overrides.CustomColorCurve then
             local color = OrbitEngine.WidgetLogic:GetFirstColorFromCurve(overrides.CustomColorCurve)
-            if color then textElement:SetTextColor(color.r or 1, color.g or 1, color.b or 1, color.a or 1) end
-        elseif overrides.CustomColor and overrides.CustomColorValue and type(overrides.CustomColorValue) == "table" then
+            if color then
+                textElement:SetTextColor(color.r or 1, color.g or 1, color.b or 1, color.a or 1)
+            end
+        elseif overrides.CustomColorValue and type(overrides.CustomColorValue) == "table" then
             local c = overrides.CustomColorValue
             textElement:SetTextColor(c.r or 1, c.g or 1, c.b or 1, c.a or 1)
         end
@@ -717,14 +777,6 @@ function Plugin:ApplyTextSettings(button, systemIndex)
         button.HotKey:SetDrawLayer("OVERLAY", 7) -- Consistent strata
         ApplyTextColor(button.HotKey, overrides)
 
-        -- Apply shadow if enabled
-        if overrides.ShowShadow then
-            button.HotKey:SetShadowOffset(1, -1)
-            button.HotKey:SetShadowColor(0, 0, 0, 1)
-        else
-            button.HotKey:SetShadowOffset(0, 0)
-        end
-
         -- Apply shortened keybind text using shared system
         if KeybindSystem then
             local shortKey = KeybindSystem:GetForButton(button)
@@ -761,13 +813,6 @@ function Plugin:ApplyTextSettings(button, systemIndex)
 
         ApplyTextColor(button.Name, overrides)
 
-        if overrides.ShowShadow then
-            button.Name:SetShadowOffset(1, -1)
-            button.Name:SetShadowColor(0, 0, 0, 1)
-        else
-            button.Name:SetShadowOffset(0, 0)
-        end
-
         ApplyComponentPosition(button.Name, "MacroText", "CENTER", "BOTTOM", 0, 2)
     end
 
@@ -802,13 +847,6 @@ function Plugin:ApplyTextSettings(button, systemIndex)
                 timerText:SetDrawLayer("OVERLAY", 7) -- Consistent strata
                 ApplyTextColor(timerText, overrides)
 
-                if overrides.ShowShadow then
-                    timerText:SetShadowOffset(1, -1)
-                    timerText:SetShadowColor(0, 0, 0, 1)
-                else
-                    timerText:SetShadowOffset(0, 0)
-                end
-
                 if pos.anchorX then
                     ApplyComponentPosition(timerText, "Timer", "CENTER", "CENTER", 0, 0)
                 end
@@ -825,13 +863,6 @@ function Plugin:ApplyTextSettings(button, systemIndex)
         button.Count:SetTextColor(1, 1, 1, 1)
         button.Count:SetDrawLayer("OVERLAY", 7) -- Consistent strata
         ApplyTextColor(button.Count, overrides)
-
-        if overrides.ShowShadow then
-            button.Count:SetShadowOffset(1, -1)
-            button.Count:SetShadowColor(0, 0, 0, 1)
-        else
-            button.Count:SetShadowOffset(0, 0)
-        end
 
         ApplyComponentPosition(button.Count, "Stacks", "LEFT", "BOTTOM", 2, 2)
     end
@@ -1119,7 +1150,9 @@ function Plugin:LayoutButtons(index)
     local limitPerLine
     if orientation == 0 then
         limitPerLine = math.ceil(totalEffective / rows)
-        if limitPerLine < 1 then limitPerLine = 1 end
+        if limitPerLine < 1 then
+            limitPerLine = 1
+        end
     else
         limitPerLine = rows
     end
@@ -1211,22 +1244,19 @@ function Plugin:LayoutButtons(index)
         local visibleCount = 0
         for i = 1, totalEffective do
             local btn = buttons[i]
-            if btn and not btn.orbitHidden then visibleCount = visibleCount + 1 end
+            if btn and not btn.orbitHidden then
+                visibleCount = visibleCount + 1
+            end
         end
         sizeCount = math.max(visibleCount, MIN_STANCE_ICONS)
     end
 
     local sizeLimitPerLine = (orientation == 0) and math.ceil(sizeCount / rows) or rows
-    if sizeLimitPerLine < 1 then sizeLimitPerLine = 1 end
+    if sizeLimitPerLine < 1 then
+        sizeLimitPerLine = 1
+    end
 
-    local finalW, finalH = OrbitEngine.Layout:ComputeGridContainerSize(
-        sizeCount,
-        sizeLimitPerLine,
-        orientation,
-        w,
-        h,
-        padding
-    )
+    local finalW, finalH = OrbitEngine.Layout:ComputeGridContainerSize(sizeCount, sizeLimitPerLine, orientation, w, h, padding)
 
     container:SetSize(finalW, finalH)
 

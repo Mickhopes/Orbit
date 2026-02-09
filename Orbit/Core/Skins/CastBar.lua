@@ -189,8 +189,10 @@ function CastBar:Apply(bar, settings)
         end
     end
 
-    -- Skin Background (fills the bar area, which is already positioned after icon)
-    if bar.bg then
+    -- Skin Background (gradient-aware)
+    if settings.backdropCurve then
+        Skin:ApplyGradientBackground(bar, settings.backdropCurve, settings.backdropColor or Constants.Colors.Background)
+    elseif bar.bg then
         local backdropColor = settings.backdropColor or Constants.Colors.Background
         bar.bg:SetColorTexture(backdropColor.r, backdropColor.g, backdropColor.b, backdropColor.a or 0.5)
         bar.bg:ClearAllPoints()
