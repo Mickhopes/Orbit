@@ -168,6 +168,7 @@ local ColorsPlugin = {
                 end
             end
         end
+        RefreshAllPreviews()
     end,
 }
 

@@ -5,6 +5,9 @@ local _, addonTable = ...
 local Orbit = addonTable
 local type, ipairs = type, ipairs
 local math_floor = math.floor
+local LSM = LibStub("LibSharedMedia-3.0")
+
+local GROUP_POSITION_FONT_SIZE = 10
 
 Orbit.StatusIconMixin = {}
 local Mixin = Orbit.StatusIconMixin
@@ -202,6 +205,10 @@ function Mixin:UpdateGroupPosition(frame, plugin)
     local unit = frame.unit
     local isInRaid = IsInRaid()
     local inEditMode = Orbit:IsEditMode()
+
+    -- Apply global font to GroupPositionText
+    local fontPath = LSM:Fetch("font", Orbit.db.GlobalSettings.Font) or "Fonts\\FRIZQT__.TTF"
+    frame.GroupPositionText:SetFont(fontPath, GROUP_POSITION_FONT_SIZE, Orbit.Skin:GetFontOutline())
 
     if isInRaid and unit then
         local raidIndex = UnitInRaid(unit)
