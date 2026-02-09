@@ -395,8 +395,19 @@ end
 -- @param disabled true to disable, false to enable
 function Anchor:SetFrameDisabled(frame, disabled)
     frame.orbitDisabled = disabled
-    if disabled and self.anchors[frame] then
-        self:BreakAnchor(frame, true)
+    if disabled then
+        if self.anchors[frame] then
+            self:BreakAnchor(frame, true)
+        end
+        for _, child in ipairs(self:GetAnchoredChildren(frame)) do
+            self:BreakAnchor(child, false)
+            if child.orbitPlugin and child.systemIndex then
+                child.orbitPlugin:SetSetting(child.systemIndex, "Anchor", nil)
+            end
+        end
+        if frame.orbitPlugin and frame.systemIndex then
+            frame.orbitPlugin:SetSetting(frame.systemIndex, "Anchor", nil)
+        end
     end
 end
 

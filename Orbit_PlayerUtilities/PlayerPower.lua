@@ -305,8 +305,15 @@ function Plugin:UpdateVisibility()
     local isEditMode = Orbit:IsEditMode()
 
     if isEditMode then
-        Frame:Show()
-        Frame:SetAlpha(enabled and 1 or 0.5)
+        if enabled then
+            OrbitEngine.FrameAnchor:SetFrameDisabled(Frame, false)
+            Frame:Show()
+            Frame:SetAlpha(1)
+        else
+            OrbitEngine.FrameAnchor:SetFrameDisabled(Frame, true)
+            Frame:Show()
+            Frame:SetAlpha(0.5)
+        end
         return
     end
 

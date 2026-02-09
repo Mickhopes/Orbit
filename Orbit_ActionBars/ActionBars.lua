@@ -10,6 +10,10 @@ local PET_BAR_INDEX = 9
 local STANCE_BAR_INDEX = 10
 local POSSESS_BAR_INDEX = 11
 local EXTRA_BAR_INDEX = 12
+local MIN_STANCE_ICONS = 2
+local VEHICLE_EXIT_INDEX = 13
+local VEHICLE_EXIT_ICON = "Interface\\Vehicles\\UI-Vehicles-Button-Exit-Up"
+local VEHICLE_EXIT_VISIBILITY = "[canexitvehicle] show; hide"
 
 local VISIBILITY_DRIVER = "[petbattle][vehicleui] hide; show"
 
@@ -179,6 +183,15 @@ function Plugin:AddSettings(dialog, systemFrame)
 
     local schema = { hideNativeSettings = true, controls = {} }
 
+    -- Vehicle Exit: simple scale-only config
+    if systemIndex == VEHICLE_EXIT_INDEX then
+        WL:AddSizeSettings(self, schema, systemIndex, systemFrame, nil, nil, {
+            key = "Scale", label = "Scale", default = 100, min = 50, max = 150,
+        })
+        Orbit.Config:Render(dialog, systemFrame, self, schema)
+        return
+    end
+
     WL:SetTabRefreshCallback(dialog, self, systemFrame)
     local currentTab = WL:AddSettingsTabs(schema, dialog, { "Layout", "Visibility" }, "Layout")
 
@@ -288,6 +301,7 @@ end
 function Plugin:OnLoad()
     -- Create containers immediately
     self:InitializeContainers()
+    self:CreateVehicleExitButton()
 
     -- Setup Canvas Mode previews for each container
     for index, container in pairs(self.containers) do
@@ -356,6 +370,58 @@ function Plugin:OnLoad()
             end
         end)
     end, self)
+end
+
+-- [ VEHICLE EXIT BUTTON ]------------------------------------------------------------------------
+function Plugin:CreateVehicleExitButton()
+    if InCombatLockdown() then return end
+
+    -- Container controls Edit Mode size and position
+    local container = CreateFrame("Frame", "OrbitVehicleExit", UIParent, "SecureHandlerStateTemplate")
+    container:SetSize(BUTTON_SIZE, BUTTON_SIZE)
+    container.systemIndex = VEHICLE_EXIT_INDEX
+    container.editModeName = "Vehicle Exit"
+    container:EnableMouse(true)
+    container:SetClampedToScreen(true)
+    container.anchorOptions = { x = true, y = true, syncScale = false, syncDimensions = false }
+
+    -- Selection highlight for Edit Mode
+    container.Selection = container:CreateTexture(nil, "OVERLAY")
+    container.Selection:SetColorTexture(1, 1, 1, 0.1)
+    container.Selection:SetAllPoints()
+    container.Selection:Hide()
+
+    OrbitEngine.Frame:AttachSettingsListener(container, self, VEHICLE_EXIT_INDEX)
+
+    -- Secure action button fills the container
+    local btn = CreateFrame("Button", "OrbitVehicleExitButton", container, "SecureActionButtonTemplate")
+    btn:SetAllPoints(container)
+    btn:SetAttribute("type", "macro")
+    btn:SetAttribute("macrotext", "/leavevehicle")
+
+    -- Icon
+    local icon = btn:CreateTexture(nil, "ARTWORK")
+    icon:SetAllPoints()
+    icon:SetTexture(VEHICLE_EXIT_ICON)
+
+    -- Highlight
+    local highlight = btn:CreateTexture(nil, "HIGHLIGHT")
+    highlight:SetAllPoints()
+    highlight:SetColorTexture(1, 1, 1, 0.15)
+
+    -- Default position (right side of Action Bar 1)
+    local bar1 = self.containers[1]
+    if bar1 then
+        container:SetPoint("LEFT", bar1, "RIGHT", 4, 0)
+    else
+        container:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 40)
+    end
+
+    -- Secure visibility driver (combat-safe show/hide)
+    RegisterStateDriver(container, "visibility", VEHICLE_EXIT_VISIBILITY)
+
+    self.containers[VEHICLE_EXIT_INDEX] = container
+    self.vehicleExitButton = container
 end
 
 function Plugin:IsComponentDisabled(componentKey, systemIndex)
@@ -1139,9 +1205,23 @@ function Plugin:LayoutButtons(index)
         end
     end
 
+    -- Stance bar: size to visible icons only (minimum MIN_STANCE_ICONS)
+    local sizeCount = totalEffective
+    if index == STANCE_BAR_INDEX then
+        local visibleCount = 0
+        for i = 1, totalEffective do
+            local btn = buttons[i]
+            if btn and not btn.orbitHidden then visibleCount = visibleCount + 1 end
+        end
+        sizeCount = math.max(visibleCount, MIN_STANCE_ICONS)
+    end
+
+    local sizeLimitPerLine = (orientation == 0) and math.ceil(sizeCount / rows) or rows
+    if sizeLimitPerLine < 1 then sizeLimitPerLine = 1 end
+
     local finalW, finalH = OrbitEngine.Layout:ComputeGridContainerSize(
-        totalEffective,
-        limitPerLine,
+        sizeCount,
+        sizeLimitPerLine,
         orientation,
         w,
         h,
@@ -1188,6 +1268,19 @@ function Plugin:ApplySettings(frame)
     end
 
     if not index or not actualFrame then
+        return
+    end
+
+    -- Vehicle exit button: toggle visibility for Edit Mode, restore position only
+    if index == VEHICLE_EXIT_INDEX then
+        if Orbit:IsEditMode() then
+            UnregisterStateDriver(actualFrame, "visibility")
+            actualFrame:Show()
+        else
+            RegisterStateDriver(actualFrame, "visibility", VEHICLE_EXIT_VISIBILITY)
+        end
+        self:ApplyScale(actualFrame, index, "Scale")
+        OrbitEngine.Frame:RestorePosition(actualFrame, self, index)
         return
     end
 

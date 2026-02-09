@@ -249,6 +249,7 @@ function Plugin:UpdateBuffs()
         anchor = anchor,
         growthX = "RIGHT",
         growthY = growthY,
+        yOffset = 0,
     }
 
     self:LayoutAurasGrid(Frame, activeIcons, anchorConfig)
@@ -268,16 +269,17 @@ function Plugin:UpdateVisibility()
         end
 
         if enabled then
+            OrbitEngine.FrameAnchor:SetFrameDisabled(Frame, false)
             if not UnitExists("focus") then
                 Frame.unit = "player"
             end
-            -- In edit mode, show preview using our own icons
             Orbit:SafeAction(function()
                 Frame:Show()
                 Frame:SetAlpha(1)
             end)
             self:ShowPreviewAuras()
         else
+            OrbitEngine.FrameAnchor:SetFrameDisabled(Frame, true)
             Orbit:SafeAction(function()
                 Frame:Hide()
             end)
@@ -370,6 +372,7 @@ function Plugin:ShowPreviewAuras()
         anchor = anchor,
         growthX = "RIGHT",
         growthY = growthY,
+        yOffset = 0,
     }
     self:LayoutAurasGrid(Frame, previews, anchorConfig)
 end
@@ -380,12 +383,13 @@ function Plugin:ApplySettings()
         return
     end
     local width = self:GetSetting(SYSTEM_INDEX, "Width")
-    local scale = self:GetSetting(SYSTEM_INDEX, "Scale") or 100
-    Frame:SetScale(scale / 100)
     local isAnchored = OrbitEngine.Frame:GetAnchorParent(Frame) ~= nil
     if not isAnchored then
+        local scale = self:GetSetting(SYSTEM_INDEX, "Scale") or 100
+        Frame:SetScale(scale / 100)
         Frame:SetWidth(width)
     else
+        Frame:SetScale(1)
         local parent = OrbitEngine.Frame:GetAnchorParent(Frame)
         if parent then
             Frame:SetWidth(parent:GetWidth())
