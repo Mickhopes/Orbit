@@ -94,5 +94,26 @@ function CooldownUtils:ApplySimpleTextStyle(plugin, systemIndex, textElement, co
     end
 end
 
+-- [ CHARGE COMPLETION TRACKING ]----------------------------------------------------------------------
+function CooldownUtils:OnChargeCast(obj)
+    if not obj._trackedCharges or obj._trackedCharges <= 0 then return end
+    obj._trackedCharges = obj._trackedCharges - 1
+    if not obj._rechargeEndsAt and obj._knownRechargeDuration then
+        obj._rechargeEndsAt = GetTime() + obj._knownRechargeDuration
+    end
+end
+
+function CooldownUtils:TrackChargeCompletion(obj)
+    if not obj._rechargeEndsAt or not obj._trackedCharges or not obj._maxCharges then return end
+    if obj._trackedCharges >= obj._maxCharges then
+        obj._rechargeEndsAt = nil
+        return
+    end
+    if GetTime() >= obj._rechargeEndsAt then
+        obj._trackedCharges = obj._trackedCharges + 1
+        obj._rechargeEndsAt = (obj._trackedCharges < obj._maxCharges) and (GetTime() + (obj._knownRechargeDuration or 0)) or nil
+    end
+end
+
 -- Export to Orbit Engine
 OrbitEngine.CooldownUtils = CooldownUtils

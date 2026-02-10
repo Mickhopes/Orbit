@@ -2,6 +2,7 @@
 local Orbit = Orbit
 local OrbitEngine = Orbit.Engine
 local Constants = Orbit.Constants
+local CooldownUtils = OrbitEngine.CooldownUtils
 
 -- [ CONSTANTS ]-------------------------------------------------------------------------------------
 local CHARGE_BAR_INDEX = Constants.Cooldown.SystemIndex.ChargeBar
@@ -16,6 +17,10 @@ local DROP_HIGHLIGHT_COLOR = { r = 0.3, g = 0.8, b = 0.3, a = 0.3 }
 local COLOR_GREEN = { r = 0.2, g = 0.9, b = 0.2 }
 local COLOR_RED = { r = 0.9, g = 0.2, b = 0.2 }
 local COLOR_BABY_BLUE = { r = 0.4, g = 0.7, b = 1.0 }
+
+local RECHARGE_PROGRESS_CURVE = C_CurveUtil.CreateCurve()
+RECHARGE_PROGRESS_CURVE:AddPoint(0.0, 1)
+RECHARGE_PROGRESS_CURVE:AddPoint(1.0, 0)
 local CHARGE_ADD_ICON = "Interface\\PaperDollInfoFrame\\Character-Plus"
 local CHARGE_REMOVE_ICON = "Interface\\Buttons\\UI-GroupLoot-Pass-Up"
 local CONTROL_BTN_SIZE = 10
@@ -706,9 +711,8 @@ function Plugin:AssignChargeSpell(frame, spellId, maxCharges)
 
     -- Cache recharge state from non-secret chargeInfo (assignment happens out of combat)
     local ci = C_Spell.GetSpellCharges(spellId)
-    frame._rechargeDuration = ci and ci.cooldownDuration or nil
-    frame._rechargeStart = nil
     frame._trackedCharges = ci and ci.currentCharges or maxCharges
+    frame._knownRechargeDuration = ci and ci.cooldownDuration or nil
 
     self:SetSetting(frame.systemIndex, self:GetSpecKey("ChargeSpell"), { id = spellId, maxCharges = maxCharges })
 
@@ -723,8 +727,6 @@ end
 function Plugin:ClearChargeFrame(frame)
     frame.chargeSpellId = nil
     frame.cachedMaxCharges = nil
-    frame._rechargeDuration = nil
-    frame._rechargeStart = nil
     frame._trackedCharges = nil
     for _, btn in ipairs(frame.buttons) do
         btn:Hide()
@@ -780,30 +782,20 @@ function Plugin:UpdateChargeFrame(frame)
     -- Sync tracked charges from API when non-secret (out of combat)
     if not issecretvalue(chargeInfo.currentCharges) then
         frame._trackedCharges = chargeInfo.currentCharges
-        if chargeInfo.cooldownStartTime == 0 then
-            frame._rechargeStart = nil
-        elseif not frame._rechargeStart then
-            frame._rechargeStart = chargeInfo.cooldownStartTime
-        end
+        frame._knownRechargeDuration = chargeInfo.cooldownDuration
+        frame._rechargeEndsAt = (chargeInfo.cooldownStartTime > 0 and chargeInfo.cooldownDuration > 0) and (chargeInfo.cooldownStartTime + chargeInfo.cooldownDuration) or nil
     end
+    CooldownUtils:TrackChargeCompletion(frame)
 
-    -- Recharge fill: self-tracked timing, single segment only
+    -- Recharge fill: native DurationObject, single segment only
     local progress = 0
     local rechargeIdx = (frame._trackedCharges or frame.cachedMaxCharges) + 1
-    if frame._rechargeStart and frame._rechargeDuration and frame._rechargeDuration > 0 then
-        local elapsed = GetTime() - frame._rechargeStart
-        progress = math.min(1, elapsed / frame._rechargeDuration)
-        if progress >= 1 then
-            frame._trackedCharges = math.min((frame._trackedCharges or 0) + 1, frame.cachedMaxCharges)
-            rechargeIdx = frame._trackedCharges + 1
-            if frame._trackedCharges < frame.cachedMaxCharges then
-                frame._rechargeStart = GetTime()
-                progress = 0
-            else
-                frame._rechargeStart = nil
-                progress = 0
-            end
-        end
+    local chargeDurObj = C_Spell.GetSpellChargeDuration and C_Spell.GetSpellChargeDuration(frame.chargeSpellId)
+    if chargeDurObj then
+        progress = chargeDurObj:EvaluateRemainingPercent(RECHARGE_PROGRESS_CURVE)
+    else
+        frame._trackedCharges = frame.cachedMaxCharges
+        frame._rechargeEndsAt = nil
     end
     for i, btn in ipairs(frame.buttons) do
         if btn.RechargeBar then
@@ -963,12 +955,8 @@ function Plugin:RestoreChargeSpell(frame, sysIndex)
 
     frame.chargeSpellId = data.id
     frame.cachedMaxCharges = data.maxCharges or 2
-    frame._rechargeDuration = ci and ci.cooldownDuration or nil
-    frame._rechargeStart = nil
     frame._trackedCharges = ci and ci.currentCharges or frame.cachedMaxCharges
-    if ci and ci.cooldownStartTime and not issecretvalue(ci.cooldownStartTime) and ci.cooldownStartTime > 0 then
-        frame._rechargeStart = ci.cooldownStartTime
-    end
+    frame._knownRechargeDuration = ci and ci.cooldownDuration or nil
     self:BuildChargeButtons(frame, frame.cachedMaxCharges)
     UpdateChargeBarLabel(frame)
 end
@@ -1041,13 +1029,7 @@ function Plugin:RegisterChargeRechargeWatcher()
             if not chargeFrame or chargeFrame.chargeSpellId ~= spellId then
                 return
             end
-            if not chargeFrame._trackedCharges or chargeFrame._trackedCharges <= 0 then
-                return
-            end
-            chargeFrame._trackedCharges = chargeFrame._trackedCharges - 1
-            if not chargeFrame._rechargeStart then
-                chargeFrame._rechargeStart = GetTime()
-            end
+            CooldownUtils:OnChargeCast(chargeFrame)
         end
         HandleCast(plugin.chargeBarAnchor)
         for _, childData in pairs(plugin.activeChargeChildren) do

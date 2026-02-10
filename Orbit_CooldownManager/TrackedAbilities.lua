@@ -75,18 +75,23 @@ local function ParseCooldownDuration(itemType, id)
     local best = nil
     for _, line in ipairs(tooltipData.lines) do
         local text = StripEscapes(line.rightText or line.leftText or "")
-        local minPart = text:match("(%d+%.?%d*) [Mm]in [Cc]ooldown")
-        local secPart = text:match("(%d+%.?%d*) [Ss]ec [Cc]ooldown")
         local compoundMin, compoundSec = text:match("(%d+%.?%d*) [Mm]in (%d+%.?%d*) [Ss]ec [Cc]ooldown")
         if compoundMin and compoundSec then
             local val = (tonumber(compoundMin) * 60) + tonumber(compoundSec)
             if not best or val > best then best = val end
-        elseif minPart then
-            local val = tonumber(minPart) * 60
-            if not best or val > best then best = val end
-        elseif secPart then
-            local val = tonumber(secPart)
-            if not best or val > best then best = val end
+        else
+            for _, keyword in ipairs({ "[Cc]ooldown", "[Rr]echarge" }) do
+                local min = text:match("(%d+%.?%d*) [Mm]in " .. keyword)
+                if min then
+                    local val = tonumber(min) * 60
+                    if not best or val > best then best = val end
+                end
+                local sec = text:match("(%d+%.?%d*) [Ss]ec " .. keyword)
+                if sec then
+                    local val = tonumber(sec)
+                    if not best or val > best then best = val end
+                end
+            end
         end
     end
     return best
@@ -439,7 +444,9 @@ end
 local function HasCooldown(itemType, id)
     if itemType == "spell" then
         local cd = GetSpellBaseCooldown(id)
-        return cd and cd > 0
+        if cd and cd > 0 then return true end
+        local ci = C_Spell.GetSpellCharges and C_Spell.GetSpellCharges(id)
+        return ci and ci.maxCharges and ci.maxCharges > 1
     elseif itemType == "item" then
         return ParseCooldownDuration("item", id) ~= nil
     end
@@ -829,30 +836,32 @@ function Plugin:UpdateTrackedIcon(icon)
             local onGCD = cdInfo.isOnGCD
             local chargeInfo = icon.isChargeSpell and C_Spell.GetSpellCharges and C_Spell.GetSpellCharges(icon.trackedId)
 
-            if onGCD and not showGCDSwipe then
-                icon.Cooldown:Clear()
-                icon.ActiveCooldown:Clear()
-                icon.Icon:SetDesaturation(0)
-            elseif chargeInfo then
-                local chargeDurObj = C_Spell.GetSpellChargesDuration and C_Spell.GetSpellChargesDuration(icon.trackedId)
+            if chargeInfo then
+                if not issecretvalue(chargeInfo.currentCharges) then
+                    icon._trackedCharges = chargeInfo.currentCharges
+                    icon._knownRechargeDuration = chargeInfo.cooldownDuration
+                    icon._rechargeEndsAt = (chargeInfo.cooldownStartTime > 0 and chargeInfo.cooldownDuration > 0) and (chargeInfo.cooldownStartTime + chargeInfo.cooldownDuration) or nil
+                end
+                CooldownUtils:TrackChargeCompletion(icon)
+                local chargeDurObj = C_Spell.GetSpellChargeDuration and C_Spell.GetSpellChargeDuration(icon.trackedId)
                 if chargeDurObj then
                     icon.Cooldown:SetCooldownFromDurationObject(chargeDurObj, true)
-                    local allConsumed = not issecretvalue(chargeInfo.currentCharges) and chargeInfo.currentCharges == 0
-                    icon.Icon:SetDesaturation(allConsumed and chargeDurObj:EvaluateRemainingPercent(icon.desatCurve or DESAT_CURVE) or 0)
-                    if icon.cdAlphaCurve and allConsumed then
-                        icon.Cooldown:SetAlpha(chargeDurObj:EvaluateRemainingPercent(icon.cdAlphaCurve))
-                    else
-                        icon.Cooldown:SetAlpha(1)
-                    end
                 else
                     icon.Cooldown:Clear()
-                    icon.Cooldown:SetAlpha(1)
-                    icon.Icon:SetDesaturation(0)
+                    icon._trackedCharges = icon._maxCharges
+                    icon._rechargeEndsAt = nil
                 end
+                local allConsumed = icon._trackedCharges and icon._trackedCharges == 0
+                icon.Icon:SetDesaturation(allConsumed and 1 or 0)
+                icon.Cooldown:SetAlpha(1)
                 icon.ActiveCooldown:Clear()
                 if icon._activeGlowing then
                     Plugin:StopActiveGlow(icon)
                 end
+            elseif onGCD and not showGCDSwipe then
+                icon.Cooldown:Clear()
+                icon.ActiveCooldown:Clear()
+                icon.Icon:SetDesaturation(0)
             else
                 durObj = C_Spell.GetSpellCooldownDuration(icon.trackedId)
                 if durObj then
@@ -1159,6 +1168,11 @@ function Plugin:LayoutTrackedIcons(anchor, systemIndex)
         if data.type == "spell" and C_Spell.GetSpellCharges then
             local ci = C_Spell.GetSpellCharges(data.id)
             icon.isChargeSpell = ci and ci.maxCharges and ci.maxCharges > 1 or false
+            if icon.isChargeSpell then
+                icon._maxCharges = ci.maxCharges
+                icon._trackedCharges = ci.currentCharges or ci.maxCharges
+                icon._knownRechargeDuration = ci.cooldownDuration
+            end
         end
 
         self:UpdateTrackedIcon(icon)
@@ -1492,8 +1506,13 @@ function Plugin:RegisterSpellCastWatcher()
                 return
             end
             for _, icon in pairs(anchor.activeIcons) do
-                if icon.trackedType == "spell" and icon.trackedId == spellId and icon.activeDuration then
-                    icon._activeGlowExpiry = GetTime() + icon.activeDuration
+                if icon.trackedType == "spell" and icon.trackedId == spellId then
+                    if icon.activeDuration then
+                        icon._activeGlowExpiry = GetTime() + icon.activeDuration
+                    end
+                    if icon.isChargeSpell then
+                        CooldownUtils:OnChargeCast(icon)
+                    end
                 end
             end
         end
