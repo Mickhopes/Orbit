@@ -284,6 +284,9 @@ Orbit.Profile.defaults = {
                     },
                     Anchor = false,
                 },
+                [4] = {
+                    aspectRatio = "1:1",
+                },
                 [20] = {
                 },
             },
@@ -530,7 +533,7 @@ Orbit.Profile.defaults = {
                 },
                 [8] = {
                     NumIcons = 12,
-                    Scale = 100,
+                    Scale = 90,
                     Rows = 12,
                     IconPadding = 2,
                     Anchor = {
@@ -997,5 +1000,27 @@ Orbit.Profile.defaults = {
                 },
             },
         },
+    },
+    GlobalSettings = {
+        OverlayTexture = "Orbit Gradient",
+        BarColorCurve = {
+            pins = {
+                {
+                    color = { a = 1, b = 1, g = 1, r = 1 },
+                    type = "class",
+                    position = 0,
+                },
+            },
+        },
+        BackdropColour = { a = 0.7, b = 0.145, g = 0.145, r = 0.145 },
+        TextScale = "Medium",
+        OverlayAllFrames = true,
+        BorderSize = 2,
+        ClassColorBackground = false,
+        FontOutline = "OUTLINE",
+        UseClassColors = true,
+        BarColor = { a = 1, b = 0.2, g = 0.8, r = 0.2 },
+        Font = "PT Sans Narrow",
+        Texture = "Solid",
     },
 }
