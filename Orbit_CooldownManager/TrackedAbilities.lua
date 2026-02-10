@@ -51,15 +51,12 @@ local function ParseActiveDuration(itemType, id)
     end
     text = StripEscapes(text)
     local best = nil
-    for _, pattern in ipairs({ "for (%d+) sec", "lasts (%d+) sec", "over (%d+) sec" }) do
+    for _, pattern in ipairs({ "for (%d+%.?%d*) sec", "lasts (%d+%.?%d*) sec", "over (%d+%.?%d*) sec" }) do
         for num in text:gmatch(pattern) do
             local n = tonumber(num)
-            if not best or n > best then
+            if n and (not best or n > best) then
                 best = n
             end
-        end
-        if best then
-            return best
         end
     end
     return best
@@ -75,18 +72,24 @@ local function ParseCooldownDuration(itemType, id)
     if not tooltipData or not tooltipData.lines then
         return nil
     end
+    local best = nil
     for _, line in ipairs(tooltipData.lines) do
         local text = StripEscapes(line.rightText or line.leftText or "")
-        local min = text:match("(%d+) [Mm]in [Cc]ooldown")
-        if min then
-            return tonumber(min) * 60
-        end
-        local sec = text:match("(%d+) [Ss]ec [Cc]ooldown")
-        if sec then
-            return tonumber(sec)
+        local minPart = text:match("(%d+%.?%d*) [Mm]in [Cc]ooldown")
+        local secPart = text:match("(%d+%.?%d*) [Ss]ec [Cc]ooldown")
+        local compoundMin, compoundSec = text:match("(%d+%.?%d*) [Mm]in (%d+%.?%d*) [Ss]ec [Cc]ooldown")
+        if compoundMin and compoundSec then
+            local val = (tonumber(compoundMin) * 60) + tonumber(compoundSec)
+            if not best or val > best then best = val end
+        elseif minPart then
+            local val = tonumber(minPart) * 60
+            if not best or val > best then best = val end
+        elseif secPart then
+            local val = tonumber(secPart)
+            if not best or val > best then best = val end
         end
     end
-    return nil
+    return best
 end
 
 local function BuildDesatCurve(activeDuration, cooldownDuration)
