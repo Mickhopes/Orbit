@@ -456,7 +456,11 @@ local function HasCooldown(itemType, id)
             return true
         end
         local ci = C_Spell.GetSpellCharges and C_Spell.GetSpellCharges(id)
-        return ci and ci.maxCharges and ci.maxCharges > 1
+        if ci and ci.maxCharges and ci.maxCharges > 1 then
+            return true
+        end
+        -- Fallback: check tooltip for cooldown text (catches talent-granted cooldowns)
+        return ParseCooldownDuration("spell", id) ~= nil
     elseif itemType == "item" then
         return ParseCooldownDuration("item", id) ~= nil
     end
