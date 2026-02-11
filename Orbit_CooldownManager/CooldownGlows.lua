@@ -13,61 +13,21 @@ local UTILITY_INDEX = Constants.Cooldown.SystemIndex.Utility
 local BUFFICON_INDEX = Constants.Cooldown.SystemIndex.BuffIcon
 
 -- [ PROC GLOW HOOKS ]-------------------------------------------------------------------------------
+local PROC_GLOW_COLOR = { 1, 0.8, 0, 1 }
+
 function CDM:HookProcGlow()
     if self.procGlowHooked or not ActionButtonSpellAlertManager then return end
 
-    local plugin = self
-    local GlowType = Constants.PandemicGlow.Type
-    local GlowConfig = Constants.PandemicGlow
-
     hooksecurefunc(ActionButtonSpellAlertManager, "ShowAlert", function(_, button)
-        local viewer = button.viewerFrame
-        if not viewer then return end
-
-        local systemIndex = viewer == EssentialCooldownViewer and ESSENTIAL_INDEX
-            or viewer == UtilityCooldownViewer and UTILITY_INDEX
-            or viewer == BuffIconCooldownViewer and BUFFICON_INDEX
-            or nil
-        if not systemIndex then return end
-
-        local glowType = plugin:GetSetting(systemIndex, "ProcGlowType") or GlowType.None
-        if glowType == GlowType.None then return end
-
-        local procColor = plugin:GetSetting(systemIndex, "ProcGlowColor") or GlowConfig.DefaultColor
-        local colorTable = { procColor.r, procColor.g, procColor.b, procColor.a or 1 }
-
         if button.SpellActivationAlert then button.SpellActivationAlert:SetAlpha(0) end
         if button.orbitProcGlowActive then return end
-
-        if glowType == GlowType.Pixel then
-            local cfg = GlowConfig.Pixel
-            LibCustomGlow.PixelGlow_Start(button, colorTable, cfg.Lines, cfg.Frequency, cfg.Length, cfg.Thickness, cfg.XOffset, cfg.YOffset, cfg.Border, "orbitProc")
-        elseif glowType == GlowType.Proc then
-            local cfg = GlowConfig.Proc
-            LibCustomGlow.ProcGlow_Start(button, { color = colorTable, startAnim = cfg.StartAnim, duration = cfg.Duration, key = "orbitProc" })
-            local glowFrame = button["_ProcGloworbitProc"]
-            if glowFrame then
-                glowFrame.startAnim = false
-                plugin:FixGlowTransparency(glowFrame, procColor.a)
-            end
-        elseif glowType == GlowType.Autocast then
-            local cfg = GlowConfig.Autocast
-            LibCustomGlow.AutoCastGlow_Start(button, colorTable, cfg.Particles, cfg.Frequency, cfg.Scale, cfg.XOffset, cfg.YOffset, "orbitProc")
-        elseif glowType == GlowType.Button then
-            local cfg = GlowConfig.Button
-            LibCustomGlow.ButtonGlow_Start(button, colorTable, cfg.Frequency, cfg.FrameLevel)
-        end
-        button.orbitProcGlowActive = glowType
+        LibCustomGlow.ButtonGlow_Start(button, PROC_GLOW_COLOR)
+        button.orbitProcGlowActive = true
     end)
 
     hooksecurefunc(ActionButtonSpellAlertManager, "HideAlert", function(_, button)
         if not button.orbitProcGlowActive then return end
-        local activeType = button.orbitProcGlowActive
-        if activeType == GlowType.Pixel then LibCustomGlow.PixelGlow_Stop(button, "orbitProc")
-        elseif activeType == GlowType.Proc then LibCustomGlow.ProcGlow_Stop(button, "orbitProc")
-        elseif activeType == GlowType.Autocast then LibCustomGlow.AutoCastGlow_Stop(button, "orbitProc")
-        elseif activeType == GlowType.Button then LibCustomGlow.ButtonGlow_Stop(button)
-        end
+        LibCustomGlow.ButtonGlow_Stop(button)
         button.orbitProcGlowActive = nil
     end)
 

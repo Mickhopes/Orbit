@@ -33,7 +33,9 @@ function Mixin:GetAnchorAxis(frame)
 end
 
 function Mixin:ApplyCastColor(bar, state)
-    if not bar or not bar.orbitBar then return end
+    if not bar or not bar.orbitBar then
+        return
+    end
     local color
     if state == "INTERRUPTED" then
         color = self:GetSetting(1, "InterruptedColor") or DEFAULT_INTERRUPTED_COLOR
@@ -44,16 +46,20 @@ function Mixin:ApplyCastColor(bar, state)
         local curveData = self:GetSetting(1, "CastBarColorCurve")
         color = OrbitEngine.WidgetLogic:GetFirstColorFromCurve(curveData) or self:GetSetting(1, "CastBarColor") or DEFAULT_CAST_COLOR
     end
-    if color then bar.orbitBar:SetStatusBarColor(color.r, color.g, color.b) end
+    if color then
+        bar.orbitBar:SetStatusBarColor(color.r, color.g, color.b)
+    end
 end
 
--- Check interrupt state via native BorderShield visibility (avoids secret value taint)
-function Mixin:UpdateInterruptState(bar)
-    if not bar or not bar.nativeSpellbar then return end
-    local nativeBar = bar.nativeSpellbar
-    local isProtected = nativeBar.BorderShield and nativeBar.BorderShield:IsShown()
-    self:ApplyCastColor(bar, isProtected and "NON_INTERRUPTIBLE" or "INTERRUPTIBLE")
-    bar.notInterruptible = isProtected or false
+-- Update interrupt state (called by UNIT_SPELLCAST_INTERRUPTIBLE / NOT_INTERRUPTIBLE events)
+-- In WoW 12.0+, notInterruptible from API returns can be a "secret boolean" for enemy units in combat,
+-- so we only set interrupt state via the dedicated events which pass explicit true/false values.
+function Mixin:UpdateInterruptState(bar, notInterruptible)
+    if not bar then
+        return
+    end
+    bar.notInterruptible = notInterruptible
+    self:ApplyCastColor(bar, notInterruptible and "NON_INTERRUPTIBLE" or "INTERRUPTIBLE")
 end
 
 -- [ FRAME CREATION ]--------------------------------------------------------------------------------
@@ -157,7 +163,9 @@ end
 
 function Mixin:AddCastBarSettings(dialog, systemFrame)
     local bar = self.CastBar
-    if not bar then return end
+    if not bar then
+        return
+    end
 
     local systemIndex = systemFrame.systemIndex or 1
     local WL = OrbitEngine.WidgetLogic
@@ -171,14 +179,22 @@ function Mixin:AddCastBarSettings(dialog, systemFrame)
         local anchorAxis = isAnchored and self:GetAnchorAxis(bar) or nil
         if not (isAnchored and anchorAxis == "x") then
             WL:AddSizeSettings(self, schema, systemIndex, systemFrame, nil, {
-                key = "CastBarHeight", label = "Height",
-                min = 15, max = 35, default = 18,
+                key = "CastBarHeight",
+                label = "Height",
+                min = 15,
+                max = 35,
+                default = 18,
             })
         end
         if not (isAnchored and anchorAxis == "y") then
             table.insert(schema.controls, {
-                type = "slider", key = "CastBarWidth", label = "Width",
-                min = 120, max = 350, step = 10, default = 200,
+                type = "slider",
+                key = "CastBarWidth",
+                label = "Width",
+                min = 120,
+                max = 350,
+                step = 10,
+                default = 200,
             })
         end
         table.insert(schema.controls, { type = "checkbox", key = "CastBarText", label = "Show Spell Name", default = true })
@@ -186,12 +202,14 @@ function Mixin:AddCastBarSettings(dialog, systemFrame)
         table.insert(schema.controls, { type = "checkbox", key = "CastBarTimer", label = "Show Timer", default = true })
     elseif currentTab == "Colour" then
         WL:AddColorCurveSettings(self, schema, systemIndex, systemFrame, {
-            key = "CastBarColorCurve", label = "Normal",
+            key = "CastBarColorCurve",
+            label = "Normal",
             default = { pins = { { position = 0, color = DEFAULT_CAST_COLOR } } },
             singleColor = true,
         })
         WL:AddColorCurveSettings(self, schema, systemIndex, systemFrame, {
-            key = "NonInterruptibleColorCurve", label = "Protected",
+            key = "NonInterruptibleColorCurve",
+            label = "Protected",
             default = { pins = { { position = 0, color = DEFAULT_PROTECTED_COLOR } } },
             singleColor = true,
         })
@@ -328,11 +346,13 @@ function Mixin:SetupUnitCastBar(bar, unit, nativeSpellbar)
     -- Cast: query APIs and use SetTimerDuration for engine-driven animation
     function bar:Cast()
         local targetBar = self.orbitBar or self
-        local name, text, texture = UnitCastingInfo(unit)
+        local name, text, texture, _, _, _, _, notInterruptible = UnitCastingInfo(unit)
         local isChanneled = false
         if not name then
-            name, text, texture = UnitChannelInfo(unit)
-            if name then isChanneled = true end
+            name, text, texture, _, _, _, notInterruptible = UnitChannelInfo(unit)
+            if name then
+                isChanneled = true
+            end
         end
         if not name then
             self:StopCast()
@@ -343,7 +363,9 @@ function Mixin:SetupUnitCastBar(bar, unit, nativeSpellbar)
         local durationObj = nil
         if type(getDurationFn) == "function" then
             local ok, dur = pcall(getDurationFn, unit)
-            if ok then durationObj = dur end
+            if ok then
+                durationObj = dur
+            end
         end
         if not durationObj then
             self:StopCast()
@@ -351,7 +373,6 @@ function Mixin:SetupUnitCastBar(bar, unit, nativeSpellbar)
         end
         self.casting = not isChanneled
         self.channeling = isChanneled
-        self.notInterruptible = false
         self.castTimestamp = GetTime()
         self.durationObj = durationObj
         self.timerThrottle = 0
@@ -360,9 +381,24 @@ function Mixin:SetupUnitCastBar(bar, unit, nativeSpellbar)
         if targetBar.SetTimerDuration then
             pcall(targetBar.SetTimerDuration, targetBar, durationObj, 0, direction)
         end
-        plugin:UpdateInterruptState(self)
-        if self.Text then self.Text:SetText(name) end
-        if self.Icon then self.Icon:SetTexture(texture or 136243) end
+        -- Safely check notInterruptible (may be a secret boolean for enemy units in combat).
+        -- pcall catches the taint error if it's secret; events will correct it in that case.
+        local ok, isProtected = pcall(function()
+            return notInterruptible and true or false
+        end)
+        if ok and isProtected then
+            self.notInterruptible = true
+            plugin:ApplyCastColor(self, "NON_INTERRUPTIBLE")
+        else
+            self.notInterruptible = false
+            plugin:ApplyCastColor(self, "INTERRUPTIBLE")
+        end
+        if self.Text then
+            self.Text:SetText(name)
+        end
+        if self.Icon then
+            self.Icon:SetTexture(texture or 136243)
+        end
         self:Show()
     end
 
@@ -371,26 +407,48 @@ function Mixin:SetupUnitCastBar(bar, unit, nativeSpellbar)
         self.casting = false
         self.channeling = false
         self.durationObj = nil
-        if not self.preview then self:Hide() end
+        if not self.preview then
+            self:Hide()
+        end
     end
 
     -- Event dispatch table
     local dispatch = {
-        UNIT_SPELLCAST_START = function() bar:Cast() end,
-        UNIT_SPELLCAST_CHANNEL_START = function() bar:Cast() end,
-        UNIT_SPELLCAST_DELAYED = function() bar:Cast() end,
-        UNIT_SPELLCAST_CHANNEL_UPDATE = function() bar:Cast() end,
-        PLAYER_TARGET_CHANGED = function() bar:Cast() end,
-        PLAYER_FOCUS_CHANGED = function() bar:Cast() end,
-        UNIT_SPELLCAST_STOP = function() bar:StopCast() end,
-        UNIT_SPELLCAST_CHANNEL_STOP = function() bar:StopCast() end,
+        UNIT_SPELLCAST_START = function()
+            bar:Cast()
+        end,
+        UNIT_SPELLCAST_CHANNEL_START = function()
+            bar:Cast()
+        end,
+        UNIT_SPELLCAST_DELAYED = function()
+            bar:Cast()
+        end,
+        UNIT_SPELLCAST_CHANNEL_UPDATE = function()
+            bar:Cast()
+        end,
+        PLAYER_TARGET_CHANGED = function()
+            bar:Cast()
+        end,
+        PLAYER_FOCUS_CHANGED = function()
+            bar:Cast()
+        end,
+        UNIT_SPELLCAST_STOP = function()
+            bar:StopCast()
+        end,
+        UNIT_SPELLCAST_CHANNEL_STOP = function()
+            bar:StopCast()
+        end,
         UNIT_SPELLCAST_FAILED = function()
-            if UnitChannelInfo(unit) or UnitCastingInfo(unit) then return end
+            if UnitChannelInfo(unit) or UnitCastingInfo(unit) then
+                return
+            end
             local failTimestamp = bar.castTimestamp
             bar.casting = false
             bar.channeling = false
             bar.durationObj = nil
-            if bar.Text then bar.Text:SetText(FAILED) end
+            if bar.Text then
+                bar.Text:SetText(FAILED)
+            end
             C_Timer.After(INTERRUPT_FLASH_DURATION, function()
                 if bar.castTimestamp == failTimestamp and not bar.casting and not bar.channeling then
                     bar:StopCast()
@@ -402,9 +460,15 @@ function Mixin:SetupUnitCastBar(bar, unit, nativeSpellbar)
             bar.casting = false
             bar.channeling = false
             bar.durationObj = nil
-            if bar.Text then bar.Text:SetText(INTERRUPTED) end
-            if bar.InterruptAnim then bar.InterruptAnim:Play() end
-            if bar.orbitBar then bar.orbitBar:SetStatusBarColor(1, 0, 0) end
+            if bar.Text then
+                bar.Text:SetText(INTERRUPTED)
+            end
+            if bar.InterruptAnim then
+                bar.InterruptAnim:Play()
+            end
+            if bar.orbitBar then
+                bar.orbitBar:SetStatusBarColor(1, 0, 0)
+            end
             C_Timer.After(INTERRUPT_FLASH_DURATION, function()
                 if bar.castTimestamp == interruptTimestamp and not bar.casting and not bar.channeling then
                     bar:StopCast()
@@ -422,20 +486,35 @@ function Mixin:SetupUnitCastBar(bar, unit, nativeSpellbar)
         end,
     }
 
-    bar:SetScript("OnEvent", function(_, event) local handler = dispatch[event] if handler then handler() end end)
+    bar:SetScript("OnEvent", function(_, event)
+        local handler = dispatch[event]
+        if handler then
+            handler()
+        end
+    end)
 end
 
 -- Setup OnUpdate handler for engine-driven cast bars (timer text only, no progress arithmetic)
 function Mixin:SetupCastBarOnUpdate(bar)
     bar:SetScript("OnUpdate", function(self, elapsed)
-        if not self:IsShown() or self.preview then return end
-        if not self.casting and not self.channeling then return end
+        if not self:IsShown() or self.preview then
+            return
+        end
+        if not self.casting and not self.channeling then
+            return
+        end
         -- Timer text: read remaining from durationObj (SetText accepts secrets as a sink)
         self.timerThrottle = (self.timerThrottle or 0) + elapsed
-        if self.timerThrottle < TIMER_THROTTLE_INTERVAL then return end
+        if self.timerThrottle < TIMER_THROTTLE_INTERVAL then
+            return
+        end
         self.timerThrottle = 0
-        if not self.Timer or not self.Timer:IsShown() then return end
-        if not self.durationObj then return end
+        if not self.Timer or not self.Timer:IsShown() then
+            return
+        end
+        if not self.durationObj then
+            return
+        end
         local getter = self.durationObj.GetRemainingDuration or self.durationObj.GetRemaining
         if getter then
             local ok, remaining = pcall(getter, self.durationObj)
@@ -445,4 +524,3 @@ function Mixin:SetupCastBarOnUpdate(bar)
         end
     end)
 end
-

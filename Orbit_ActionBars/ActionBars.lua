@@ -9,7 +9,6 @@ local INITIAL_FRAME_SIZE = 40
 local PET_BAR_INDEX = 9
 local STANCE_BAR_INDEX = 10
 local POSSESS_BAR_INDEX = 11
-local EXTRA_BAR_INDEX = 12
 local MIN_STANCE_ICONS = 2
 local VEHICLE_EXIT_INDEX = 13
 local VEHICLE_EXIT_ICON = "Interface\\Vehicles\\UI-Vehicles-Button-Exit-Up"
@@ -20,7 +19,15 @@ local VISIBILITY_DRIVER = "[petbattle][vehicleui] hide; show"
 local SPECIAL_BAR_INDICES = {
     [STANCE_BAR_INDEX] = true,
     [POSSESS_BAR_INDEX] = true,
-    [EXTRA_BAR_INDEX] = true,
+}
+
+local DROPPABLE_CURSOR_TYPES = {
+    spell = true,
+    petaction = true,
+    flyout = true,
+    item = true,
+    macro = true,
+    mount = true,
 }
 
 -- [ PLUGIN REGISTRATION ]---------------------------------------------------------------------------
@@ -400,14 +407,8 @@ function Plugin:OnLoad()
 
     -- Register for cursor changes to show/hide empty slots when dragging spells
     Orbit.EventBus:On("CURSOR_CHANGED", function()
-        -- Check if cursor is holding something droppable
         local cursorType = GetCursorInfo()
-        local isDraggingDroppable = cursorType == "spell"
-            or cursorType == "petaction"
-            or cursorType == "flyout"
-            or cursorType == "item"
-            or cursorType == "macro"
-            or cursorType == "mount"
+        local isDraggingDroppable = DROPPABLE_CURSOR_TYPES[cursorType]
 
         -- Track drag state to know when to re-hide buttons after drop
         local wasDragging = self.isDraggingDroppable
@@ -615,19 +616,14 @@ function Plugin:SetupCanvasPreview(container, systemIndex)
                 end
             end
 
-            -- Create draggable component if available
+            -- Create draggable component
             if CreateDraggableComponent then
                 local comp = CreateDraggableComponent(preview, def.key, fs, startX, startY, data)
                 if comp then
-                    -- Ensure text is above the border
                     comp:SetFrameLevel(preview:GetFrameLevel() + 10)
                     preview.components[def.key] = comp
                     fs:Hide()
                 end
-            else
-                -- Fallback: just position the FontString directly
-                fs:ClearAllPoints()
-                fs:SetPoint("CENTER", preview, "CENTER", startX, startY)
             end
         end
 
@@ -1000,7 +996,7 @@ function Plugin:ReparentButtons(index)
     end
 
     -- Strategy 3: Children scan (Fallback)
-    if #buttons == 0 then
+    if #buttons == 0 and blizzBar then
         local children = { blizzBar:GetChildren() }
         for _, child in ipairs(children) do
             if child.action or child.icon then
@@ -1066,14 +1062,9 @@ function Plugin:LayoutButtons(index)
         hideEmpty = true
     end
 
-    -- CURSOR OVERRIDE: Show grid when dragging droppable content (spell, petaction, flyout, etc.)
+    -- CURSOR OVERRIDE: Show grid when dragging droppable content
     local cursorType = GetCursorInfo()
-    local cursorOverridesHide = cursorType == "spell"
-        or cursorType == "petaction"
-        or cursorType == "flyout"
-        or cursorType == "item"
-        or cursorType == "macro"
-        or cursorType == "mount"
+    local cursorOverridesHide = DROPPABLE_CURSOR_TYPES[cursorType]
 
     local isSpecialBar = SPECIAL_BAR_INDICES[index]
     if cursorOverridesHide and not isSpecialBar then
@@ -1319,8 +1310,7 @@ function Plugin:ApplySettings(frame)
     OrbitEngine.FrameAnchor:SetFrameDisabled(actualFrame, false)
 
     -- Re-register visibility driver if it was disabled
-    if index == 1 then
-    else
+    if index ~= 1 then
         RegisterStateDriver(actualFrame, "visibility", VISIBILITY_DRIVER)
     end
 

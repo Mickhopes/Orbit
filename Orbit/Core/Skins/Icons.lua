@@ -567,14 +567,6 @@ function Icons:ApplyCustom(icon, settings)
             end
         end
 
-        if r.proc then
-            r.proc:ClearAllPoints()
-            r.proc:SetPoint("CENTER")
-            r.proc:SetSize(newWidth * Constants.IconScale.ProcGlowScale, newHeight * Constants.IconScale.ProcGlowScale)
-            -- Raise above border (which uses MEDIUM strata)
-            r.proc:SetFrameStrata("HIGH")
-            r.proc:SetFrameLevel(50)
-        end
 
         if r.pandemic then
             r.pandemic:ClearAllPoints()
@@ -648,6 +640,7 @@ function Icons:ApplyActionButtonCustom(button, settings)
     end
 
     local w, h = button:GetSize()
+    local borderInset = (settings.borderSize or 1) * 2
 
     -- Reset Blizzard textures using helper
     ResetRegion(button.NormalTexture)
@@ -715,14 +708,30 @@ function Icons:ApplyActionButtonCustom(button, settings)
         cooldown:SetAllPoints(button)
     end
 
-    -- Resize proc glow (SpellActivationAlert)
-    if button.SpellActivationAlert then
-        button.SpellActivationAlert:ClearAllPoints()
-        button.SpellActivationAlert:SetPoint("CENTER", button, "CENTER", 0, 0)
-        local procScale = w * Constants.IconScale.ProcGlowScale
-        button.SpellActivationAlert:SetSize(procScale, procScale)
-        button.SpellActivationAlert:SetFrameStrata("HIGH")
-        button.SpellActivationAlert:SetFrameLevel(Constants.Levels.ProcOverlay)
+    local totalSize = w + borderInset
+
+    -- Resize SpellHighlightTexture (spellbook hover highlight — extend over border)
+    if button.SpellHighlightTexture then
+        button.SpellHighlightTexture:ClearAllPoints()
+        button.SpellHighlightTexture:SetPoint("TOPLEFT", button, "TOPLEFT", -borderInset, borderInset)
+        button.SpellHighlightTexture:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", borderInset, -borderInset)
+        button.SpellHighlightTexture:SetColorTexture(1, 1, 1, 0.6)
+    end
+
+    -- Resize NewActionTexture (new action glow — extend over border)
+    if button.NewActionTexture then
+        button.NewActionTexture:ClearAllPoints()
+        button.NewActionTexture:SetPoint("TOPLEFT", button, "TOPLEFT", -borderInset, borderInset)
+        button.NewActionTexture:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", borderInset, -borderInset)
+        button.NewActionTexture:SetColorTexture(1, 1, 1, 1)
+    end
+
+    -- Resize Flash texture (auto-attack flash — extend over border)
+    if button.Flash then
+        button.Flash:ClearAllPoints()
+        button.Flash:SetPoint("TOPLEFT", button, "TOPLEFT", -borderInset, borderInset)
+        button.Flash:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", borderInset, -borderInset)
+        button.Flash:SetColorTexture(1, 1, 0.4, 1)
     end
 
     -- Resize autoCast shine
@@ -751,7 +760,7 @@ function Icons:ApplyActionButtonCustom(button, settings)
         end
     end
 
-    -- Scale casting overlays
+    -- Scale casting overlays (sized to icon — native 128px already extends to border area)
     local scaleRatio = w / STANDARD_ACTION_BUTTON_SIZE
 
     local overlays = {
@@ -767,6 +776,36 @@ function Icons:ApplyActionButtonCustom(button, settings)
             overlay:SetPoint("CENTER", button, "CENTER", 0, 0)
             overlay:SetScale(scaleRatio)
         end
+    end
+
+    -- Hook Assisted Combat rotation glow (lazily created — inner textures use atlas sizes)
+    if button.UpdateAssistedCombatRotationFrame and not button.orbitAssistedHooked then
+        hooksecurefunc(button, "UpdateAssistedCombatRotationFrame", function(self)
+            local frame = self.AssistedCombatRotationFrame
+            if not frame or frame.orbitScaled then return end
+            frame:ClearAllPoints()
+            frame:SetPoint("CENTER", self, "CENTER", 0, 0)
+            frame:SetScale(scaleRatio)
+            frame.orbitScaled = true
+        end)
+        button.orbitAssistedHooked = true
+    end
+
+    -- Hook One Button Assist highlight (marching ants — lazily created by global AssistedCombatManager)
+    button.orbitButtonWidth = w + borderInset
+    button.orbitButtonHeight = h + borderInset
+    if AssistedCombatManager and not Icons.orbitHighlightHooked then
+        hooksecurefunc(AssistedCombatManager, "SetAssistedHighlightFrameShown", function(_, actionButton)
+            local frame = actionButton.AssistedCombatHighlightFrame
+            if not frame or frame.orbitScaled or not actionButton.orbitButtonWidth then return end
+            local bw, bh = actionButton.orbitButtonWidth, actionButton.orbitButtonHeight
+            frame:SetSize(bw, bh)
+            if frame.Flipbook then
+                frame.Flipbook:SetSize(bw * 1.4, bh * 1.4)
+            end
+            frame.orbitScaled = true
+        end)
+        Icons.orbitHighlightHooked = true
     end
 
     -- Apply base icon skin (texcoord, border, swipe)
